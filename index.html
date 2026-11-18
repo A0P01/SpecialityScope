@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<!--
+  SpecialtyScope — open source (MIT License). Copyright (c) 2026 the SpecialtyScope contributors.
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this file, to use, copy,
+  modify, merge, publish, distribute, sublicense, and/or sell copies, subject to keeping this notice.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+  Data belongs to its publishers (Doximity, Medscape, Marit Health, NRMP, AAMC, U.S. DoD); see the Sources tab.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpecialtyScope</title>
+<meta name="description" content="A self-check that matches your personality, stress tolerance, lifestyle and values to 51 medical specialties, using real data on burnout, lawsuits, hours, training and pay.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a clinical "ECG paper" world — pink grid paper, one red trace, ceil-blue (scrub) interface, data in monospace readouts. */
+:root{
+  --paper:#FBF6F0; --grid:rgba(214,76,76,.11); --grid2:rgba(214,76,76,.05);
+  --ink:#1B2130; --muted:#586174; --card:#FFFFFF; --card2:#FFF9F4; --line:#EBDFD5;
+  --ceil:#3F63C6; --ceil-soft:#E2E9FA; --trace:#D3343D; --trace-soft:#FBE4E3;
+  --ok:#23804F; --warn:#B26A0C; --bad:#B8322A;
+  --c-surg:#D3343D; --c-imsub:#3F63C6; --c-med:#7652C4; --c-primary:#23804F; --c-peds:#C9760F; --c-img:#13808F; --c-acute:#B13A78;
+  --font-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:14px; --shadow:0 1px 2px rgba(27,33,48,.06), 0 8px 24px rgba(27,33,48,.06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#10131A; --grid:rgba(255,105,110,.075); --grid2:rgba(255,105,110,.03);
+    --ink:#EDEFF4; --muted:#A4ABBA; --card:#191D27; --card2:#1D2230; --line:#2B3140;
+    --ceil:#8FA9F3; --ceil-soft:#202A45; --trace:#FF5F67; --trace-soft:#3B1F25;
+    --ok:#5CC48A; --warn:#F2A541; --bad:#FF7A70;
+    --c-surg:#FF6B72; --c-imsub:#8FA9F3; --c-med:#B59BF2; --c-primary:#5CC48A; --c-peds:#F5A94A; --c-img:#4CC3D3; --c-acute:#E57DB4;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10131A; --grid:rgba(255,105,110,.075); --grid2:rgba(255,105,110,.03);
+  --ink:#EDEFF4; --muted:#A4ABBA; --card:#191D27; --card2:#1D2230; --line:#2B3140;
+  --ceil:#8FA9F3; --ceil-soft:#202A45; --trace:#FF5F67; --trace-soft:#3B1F25;
+  --ok:#5CC48A; --warn:#F2A541; --bad:#FF7A70;
+  --c-surg:#FF6B72; --c-imsub:#8FA9F3; --c-med:#B59BF2; --c-primary:#5CC48A; --c-peds:#F5A94A; --c-img:#4CC3D3; --c-acute:#E57DB4;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+select{max-width:100%; min-width:0}
+.form label,.cmp-pickers label,.row > *{min-width:0}
+.input{min-width:0; max-width:100%}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.5;
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(var(--grid2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid2) 1px, transparent 1px);
+  background-size:40px 40px,40px 40px,8px 8px,8px 8px;
+}
+a{color:var(--ceil)}
+h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0; letter-spacing:-.01em}
+h2{font-size:clamp(1.5rem,4vw,2.1rem); font-weight:800}
+h3{font-size:1.15rem; font-weight:700}
+p{margin:0}
+.mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+.wrap{max-width:1120px; margin:0 auto; padding:0 16px}
+button,select,input{font:inherit; color:inherit}
+:focus-visible{outline:3px solid var(--ceil); outline-offset:2px; border-radius:6px}
+
+/* Header + tabs */
+.top{position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-bottom:1px solid var(--line)}
+.top-row{display:flex; align-items:center; gap:12px; padding-top:10px}
+.brand{display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--ink); font-family:var(--font-display); font-weight:800; font-size:1.2rem; letter-spacing:-.02em}
+.brand svg{flex:none}
+.brand b{color:var(--trace)}
+.tabs{display:flex; gap:6px; overflow-x:auto; padding:10px 0 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none; text-decoration:none; color:var(--ink); padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--card); font-weight:700; font-size:.92rem; white-space:nowrap}
+.tab[aria-current="page"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.tab .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--trace); margin-right:6px; vertical-align:1px}
+
+main{padding-bottom:40px}
+section.view{padding-top:22px; display:grid; gap:22px}
+section.view > *, .quiz-layout > *{min-width:0}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
+.pad{padding:18px}
+@media (min-width:720px){.pad{padding:24px}}
+.eyebrow{font-family:var(--font-mono); font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; color:var(--trace); font-weight:600}
+.section-head{display:grid; gap:6px}
+.section-head p{max-width:65ch; color:var(--muted)}
+
+/* Hero */
+.hero{display:grid; gap:14px; padding:26px 0 6px}
+.hero h1{font-size:clamp(2.2rem,8vw,4.4rem); line-height:.98; font-weight:800; letter-spacing:-.035em; max-width:14ch}
+.hero h1 em{font-style:normal; color:var(--trace)}
+.hero .lede{font-size:clamp(1.02rem,2.6vw,1.2rem); max-width:56ch; color:var(--muted)}
+.ecg{width:100%; height:64px; display:block}
+.ecg path{fill:none; stroke:var(--trace); stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round}
+@media (prefers-reduced-motion:no-preference){
+  .ecg path{stroke-dasharray:1600; stroke-dashoffset:0; animation:trace 2.2s ease-out 1}
+  @keyframes trace{from{stroke-dashoffset:1600}to{stroke-dashoffset:0}}
+}
+.readout{display:flex; flex-wrap:wrap; gap:8px}
+.pill{font-family:var(--font-mono); font-size:.8rem; padding:5px 10px; border-radius:999px; background:var(--card); border:1px solid var(--line); color:var(--ink)}
+.pill b{color:var(--trace)}
+.cta-row{display:flex; flex-wrap:wrap; gap:10px}
+.btn{display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:11px; border:1px solid var(--line); background:var(--card); font-weight:700; cursor:pointer; text-decoration:none; color:var(--ink); min-height:44px}
+.btn:hover{border-color:var(--ceil)}
+.btn.primary{background:var(--ceil); border-color:var(--ceil); color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0E1220}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0E1220}}
+.btn.small{padding:7px 12px; min-height:36px; font-size:.88rem}
+
+/* Quiz */
+.quiz{display:grid; gap:18px}
+@media (min-width:900px){.quiz-layout{display:grid; grid-template-columns:1.05fr 1fr; gap:22px; align-items:start}}
+.q{display:grid; gap:8px}
+.q-title{font-weight:700}
+.q-title .n{font-family:var(--font-mono); color:var(--trace); margin-right:6px}
+.opts{display:flex; flex-wrap:wrap; gap:8px}
+.opt{padding:9px 13px; border-radius:10px; border:1px solid var(--line); background:var(--card2); cursor:pointer; font-weight:700; font-size:.93rem; min-height:42px}
+.opt[aria-pressed="true"]{background:var(--ceil); border-color:var(--ceil); color:#fff}
+:root[data-theme="dark"] .opt[aria-pressed="true"]{color:#0E1220}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .opt[aria-pressed="true"]{color:#0E1220}}
+.results{display:grid; gap:12px}
+.result{display:grid; grid-template-columns:auto 1fr; gap:12px; padding:14px; border-radius:12px; border:1px solid var(--line); background:var(--card2)}
+.result .rank{font-family:var(--font-mono); font-size:1.5rem; font-weight:600; color:var(--trace); line-height:1}
+.result h3{font-size:1.12rem}
+.fit{display:flex; align-items:center; gap:8px; margin:6px 0}
+.meter{flex:1; height:8px; border-radius:99px; background:var(--ceil-soft); overflow:hidden}
+.meter i{display:block; height:100%; background:var(--ceil); border-radius:99px}
+.reasons{display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px}
+.tag{font-size:.8rem; padding:3px 8px; border-radius:7px; background:var(--card); border:1px solid var(--line)}
+.tag.warn{border-color:color-mix(in srgb, var(--warn) 50%, var(--line)); color:var(--warn)}
+.chip{justify-self:start; width:fit-content; display:inline-flex; align-items:center; gap:6px; font-size:.78rem; font-weight:700; padding:3px 9px; border-radius:999px; border:1px solid currentColor}
+.chip::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+
+/* Explore */
+.controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.input, select{padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); min-height:44px}
+.input{flex:1 1 220px}
+.filter-chips{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin}
+.fchip{flex:none; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--card); cursor:pointer; font-weight:700; font-size:.86rem}
+.fchip[aria-pressed="true"]{border-color:currentColor; box-shadow:inset 0 0 0 1px currentColor}
+.grid-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px}
+.scard{text-align:left; cursor:pointer; padding:16px; display:grid; gap:8px; border-top:4px solid var(--cat,#888)}
+.scard:hover{border-color:var(--ceil); border-top-color:var(--cat)}
+.scard .pay{font-family:var(--font-mono); font-size:1.45rem; font-weight:600; letter-spacing:-.02em}
+.bar{height:6px; border-radius:99px; background:var(--line); overflow:hidden}
+.bar i{display:block; height:100%; background:var(--cat,var(--ceil))}
+.stats{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:.86rem; color:var(--muted)}
+.stats b{color:var(--ink); font-family:var(--font-mono); font-weight:600}
+.count{font-family:var(--font-mono); font-size:.85rem; color:var(--muted)}
+
+/* Sheet */
+.sheet{position:fixed; inset:0; z-index:50; display:flex; align-items:flex-end; justify-content:center}
+.sheet[hidden]{display:none}
+.sheet-backdrop{position:absolute; inset:0; background:rgba(10,12,18,.45)}
+.sheet-panel{position:relative; width:min(720px,100%); max-height:88%; overflow:auto; background:var(--card); border-radius:18px 18px 0 0; padding:22px 18px 28px; box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+@media (min-width:760px){.sheet{align-items:center}.sheet-panel{border-radius:18px; padding:28px}}
+.sheet-close{position:absolute; top:12px; right:12px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--card2); cursor:pointer; font-size:1.3rem; line-height:1}
+.kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px}
+.kv > div{padding:12px; border-radius:11px; background:var(--card2); border:1px solid var(--line)}
+.kv .k{font-size:.78rem; color:var(--muted); font-weight:700}
+.kv .v{font-family:var(--font-mono); font-size:1.15rem; font-weight:600}
+.kv .s{font-size:.74rem; color:var(--muted)}
+.block{display:grid; gap:10px; margin-top:18px}
+.note{font-size:.86rem; color:var(--muted); padding:10px 12px; border-left:3px solid var(--ceil); background:var(--ceil-soft); border-radius:0 10px 10px 0}
+.note.red{border-left-color:var(--trace); background:var(--trace-soft)}
+
+/* Charts */
+.chart{width:100%; position:relative}
+.chart svg{display:block; width:100%; height:auto; overflow:visible}
+.axis text, .lbl{fill:var(--muted); font-family:var(--font-mono); font-size:11px}
+.axis line, .axis path{stroke:var(--line)}
+.gridline{stroke:var(--line); stroke-dasharray:2 4}
+.legend{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:.84rem; color:var(--muted)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+.readpanel{display:grid; gap:6px; padding:14px; border-radius:12px; background:var(--card2); border:1px solid var(--line)}
+.rank-list{display:grid; gap:7px}
+.rrow{display:grid; grid-template-columns:minmax(120px,190px) 1fr auto; gap:10px; align-items:center; font-size:.9rem; cursor:pointer; padding:3px 4px; border-radius:8px; border:0; background:none; text-align:left}
+.rrow:hover{background:var(--card2)}
+.rrow .rb{height:12px; border-radius:6px; background:var(--line); overflow:hidden}
+.rrow .rb i{display:block; height:100%}
+.rrow .rv{font-family:var(--font-mono); font-size:.86rem; min-width:64px; text-align:right}
+@media (max-width:520px){.rrow{grid-template-columns:110px 1fr auto; font-size:.82rem}}
+
+/* Compare */
+.cmp-pickers{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px}
+.cmp-pickers label{display:grid; gap:4px; font-weight:700; font-size:.88rem}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-size:.92rem}
+th,td{padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
+th{font-size:.8rem; color:var(--muted)}
+td.num{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+
+/* Chance */
+.seg{display:inline-flex; padding:4px; border-radius:12px; background:var(--card); border:1px solid var(--line); gap:4px; flex-wrap:wrap}
+.seg button{padding:9px 14px; border-radius:9px; border:0; background:none; cursor:pointer; font-weight:700; min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--ink); color:var(--paper)}
+.form{display:grid; gap:14px}
+.form label{display:grid; gap:5px; font-weight:700; font-size:.9rem}
+.form .row{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px}
+.checks{display:grid; gap:8px}
+.checks label{display:flex; gap:10px; align-items:flex-start; font-weight:400}
+.checks input{width:20px; height:20px; margin-top:2px; accent-color:var(--ceil)}
+input[type=range]{width:100%; accent-color:var(--ceil)}
+.big-odds{display:flex; align-items:center; gap:18px; flex-wrap:wrap}
+.ring{width:132px; height:132px; flex:none}
+.ring .bg{stroke:var(--ceil-soft)} .ring .fg{stroke:var(--ceil); transition:stroke-dashoffset .4s ease}
+@media (prefers-reduced-motion:reduce){.ring .fg{transition:none}}
+.ring text{font-family:var(--font-mono); font-weight:600; fill:var(--ink)}
+.steps{display:grid; gap:8px}
+.steprow{display:grid; grid-template-columns:1fr auto; gap:8px; padding:9px 12px; border-radius:10px; background:var(--card2); border:1px solid var(--line); font-size:.9rem}
+.steprow b{font-family:var(--font-mono)}
+.heat{border-collapse:separate; border-spacing:3px; font-size:.78rem; min-width:620px}
+.heat th{font-family:var(--font-mono); font-weight:600; text-align:center; padding:4px; border:0}
+.heat td{font-family:var(--font-mono); text-align:center; padding:8px 4px; border-radius:6px; border:0; cursor:pointer; color:#10131A}
+.heat td.sel{outline:3px solid var(--ink); outline-offset:-1px}
+.heat td.na{background:var(--card2); color:var(--muted); cursor:default}
+
+/* HPSP */
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px}
+.fact{padding:16px; display:grid; gap:6px; border-left:4px solid var(--ceil)}
+.fact .big{font-family:var(--font-mono); font-size:1.35rem; font-weight:600}
+.src{font-size:.76rem; color:var(--muted)}
+.src a{color:var(--muted)}
+.tl{display:grid; gap:10px}
+.tl-row{display:grid; gap:6px}
+.tl-bar{display:flex; height:34px; border-radius:9px; overflow:hidden; border:1px solid var(--line)}
+.tl-bar span{min-width:0; display:flex; align-items:center; justify-content:center; font-size:.74rem; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; padding:0 4px}
+.dates{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px}
+
+
+.btn.big{padding:14px 22px; font-size:1.05rem; min-height:52px}
+.three{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px}
+.mini{display:grid; gap:6px}
+/* Bubbles */
+.bubbles{position:relative; width:100%; height:560px; margin-top:10px; border-radius:12px; overflow:hidden; background:radial-gradient(ellipse at 50% 45%, var(--card2), transparent 70%)}
+@media (min-width:760px){.bubbles{height:600px}}
+.bub{position:absolute; border-radius:50%; border:0; cursor:pointer; display:flex; align-items:center; justify-content:center; text-align:center; padding:4px; color:#fff; font-family:var(--font-display); font-weight:700; line-height:1.05; box-shadow:0 6px 16px rgba(0,0,0,.14); transition:left .6s ease, top .6s ease, width .6s ease, height .6s ease, opacity .3s}
+.bub span{display:block; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+.bub.nodata{opacity:.35}
+.bub:hover, .bub:focus-visible{filter:brightness(1.08); z-index:3}
+@media (prefers-reduced-motion:no-preference){
+  .bub{animation:floaty var(--dur,7s) ease-in-out var(--delay,0s) infinite alternate}
+  @keyframes floaty{from{transform:translate(0,0)}to{transform:translate(var(--dx,3px),var(--dy,-5px))}}
+}
+/* Self-check flow */
+.flow{display:grid; gap:18px; max-width:760px; margin:0 auto; width:100%}
+.progress{height:8px; border-radius:99px; background:var(--ceil-soft); overflow:hidden}
+.progress i{display:block; height:100%; background:var(--trace); transition:width .3s}
+.statement{font-family:var(--font-display); font-weight:700; font-size:clamp(1.35rem,4.6vw,2rem); line-height:1.2; letter-spacing:-.015em; text-wrap:balance; min-height:3.6em}
+.likert{display:grid; gap:8px}
+@media (min-width:640px){.likert{grid-template-columns:repeat(5,1fr)}}
+.lk{padding:12px 10px; border-radius:12px; border:1px solid var(--line); background:var(--card2); cursor:pointer; font-weight:700; min-height:48px}
+.lk[aria-pressed="true"]{background:var(--ceil); border-color:var(--ceil); color:#fff}
+.flow-nav{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap}
+textarea{width:100%; min-height:84px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card2); font:inherit; color:inherit; resize:vertical}
+.portrait{display:grid; gap:10px}
+.prow{display:grid; grid-template-columns:1fr; gap:4px}
+.prow .ends{display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted)}
+.ptrack{position:relative; height:10px; border-radius:99px; background:linear-gradient(90deg, var(--ceil-soft), var(--line), var(--trace-soft))}
+.ptrack i{position:absolute; top:50%; width:18px; height:18px; border-radius:50%; background:var(--ink); border:3px solid var(--card); transform:translate(-50%,-50%); box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.moneybox{border:2px solid var(--warn); border-radius:var(--r); padding:16px; background:var(--card)}
+.wbars{display:grid; gap:8px}
+.wbar{display:grid; grid-template-columns:150px 1fr; gap:10px; align-items:center; font-size:.86rem}
+.wbar .t{height:10px; border-radius:99px; background:var(--line); overflow:hidden}
+.wbar .t i{display:block; height:100%; background:var(--ceil); border-radius:99px}
+@media (max-width:460px){.wbar{grid-template-columns:120px 1fr}}
+
+.two-col{display:grid; gap:22px}
+@media (min-width:900px){.two-col{grid-template-columns:1fr 1fr}}
+/* Sources */
+.src-list{display:grid; gap:10px}
+.src-item{padding:14px 16px; display:grid; gap:4px}
+.src-item a{font-weight:700}
+footer{border-top:1px solid var(--line); padding:22px 0 40px; color:var(--muted); font-size:.86rem}
+.disclaimer{font-size:.84rem; color:var(--muted); padding:12px 14px; border:1px dashed var(--line); border-radius:12px; background:var(--card)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <a class="brand" href="#start" aria-label="SpecialtyScope home">
+        <svg width="30" height="22" viewBox="0 0 30 22" aria-hidden="true"><path d="M1 13h7l2-6 3 12 3-17 3 11h10" fill="none" stroke="var(--trace)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        <span>Specialty<b>Scope</b></span>
+      </a>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab" href="#start" data-view="start">Home</a>
+      <a class="tab" href="#quiz" data-view="quiz"><span class="dot"></span>Self-check</a>
+      <a class="tab" href="#explore" data-view="explore">Explore 51</a>
+      <a class="tab" href="#lifestyle" data-view="lifestyle">Lifestyle</a>
+      <a class="tab" href="#compare" data-view="compare">Compare</a>
+      <a class="tab" href="#chance" data-view="chance">Chance me</a>
+      <a class="tab" href="#hpsp" data-view="hpsp">HPSP</a>
+      <a class="tab" href="#sources" data-view="sources">Sources</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- START -->
+<section class="view" id="view-start">
+  <div class="hero">
+    <svg class="ecg" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40 H180 l12 -8 l10 8 H300 l10 0 l8 -34 l12 56 l10 -30 l8 8 H520 l12 -8 l10 8 H640 l8 0 l8 -34 l12 56 l10 -30 l8 8 H860 l12 -8 l10 8 H1000"/></svg>
+    <p class="eyebrow">For premeds and med students</p>
+    <h1>Not the highest-paid specialty. <em>Yours.</em></h1>
+    <p class="lede">A 5-minute self-check about your personality, your stress limits, your life outside work and how you feel about research. Then we match you to 51 specialties using real data on burnout, lawsuits, hours and training, not just pay.</p>
+    <div class="cta-row">
+      <a class="btn primary big" href="#quiz">Start the self-check →</a>
+      <a class="btn" href="#explore">Browse all 51</a>
+    </div>
+  </div>
+
+  <div class="card pad" id="bubbles-card">
+    <div class="section-head">
+      <p class="eyebrow">Tap a bubble</p>
+      <h2>51 specialties, by what the work asks of you</h2>
+      <p class="small">Resize the bubbles by what matters to you. Pay is just one option.</p>
+    </div>
+    <div class="filter-chips" id="bub-size" role="group" aria-label="Size bubbles by" style="margin-top:12px"></div>
+    <div class="bubbles" id="bubbles" aria-label="Specialty bubbles"></div>
+    <div class="legend" id="bub-legend"></div>
+    <p class="small muted" id="bub-note" style="margin-top:6px"></p>
+  </div>
+
+  <div class="three">
+    <div class="card pad mini">
+      <p class="eyebrow">01 · Know yourself</p>
+      <h3>Personality, stress and life</h3>
+      <p class="small muted">15 honest statements about people, pressure, sad outcomes, lawsuits, research and money.</p>
+    </div>
+    <div class="card pad mini">
+      <p class="eyebrow">02 · Check your why</p>
+      <h3>The money check</h3>
+      <p class="small muted">See your matches as if every specialty paid the same, and which picks still hold up.</p>
+    </div>
+    <div class="card pad mini">
+      <p class="eyebrow">03 · Reality check</p>
+      <h3>Data, not vibes</h3>
+      <p class="small muted">Burnout (AMA 2026), lawsuits (AMA), hours (Marit 2026), match odds (NRMP 2026).</p>
+    </div>
+  </div>
+
+  <div class="card pad" id="personality-note">
+    <p class="eyebrow">Is there a "surgeon personality"?</p>
+    <h3 style="margin-top:4px">Less than TikTok says.</h3>
+    <p style="margin-top:8px; max-width:68ch">In a study of 2,345 board-certified physicians, surgeons scored a little higher on extraversion and openness and lower on neuroticism than medical specialists, with no difference in agreeableness or conscientiousness (Stienen et al., <i>BMJ Open</i> 2018). Those differences are small, and people overlap a lot. So SpecialtyScope matches you on what each field's daily work demands, like patient contact, emergencies, sad outcomes and hands-on work, instead of stereotypes about who "belongs" there.</p>
+  </div>
+</section>
+
+<!-- SELF-CHECK -->
+<section class="view" id="view-quiz" hidden>
+  <div id="quiz-flow" class="card pad flow"></div>
+  <div id="quiz-results" hidden></div>
+</section>
+
+<!-- EXPLORE -->
+<section class="view" id="view-explore" hidden>
+  <div class="section-head">
+    <p class="eyebrow">All 51 specialties</p>
+    <h2>Explore every specialty</h2>
+    <p>Average pay comes from Doximity's 2026 report, the one source that covers all 51 specialties. Hours, vacation and match odds appear where the data exists.</p>
+  </div>
+  <div class="controls">
+    <label class="sr" for="ex-search" style="position:absolute;left:-9999px">Search specialties</label>
+    <input class="input" id="ex-search" type="search" placeholder="Search, e.g. cardio, peds, surgery" autocomplete="off">
+    <label for="ex-sort" style="position:absolute;left:-9999px">Sort by</label>
+    <select id="ex-sort">
+      <option value="pay">Highest pay</option>
+      <option value="hours">Fewest hours</option>
+      <option value="train">Shortest training</option>
+      <option value="match">Most competitive</option>
+      <option value="name">A to Z</option>
+    </select>
+  </div>
+  <div class="filter-chips" id="ex-cats" role="group" aria-label="Filter by category"></div>
+  <p class="count" id="ex-count"></p>
+  <div class="grid-cards" id="ex-grid"></div>
+</section>
+
+<!-- LIFESTYLE -->
+<section class="view" id="view-lifestyle" hidden>
+  <div class="section-head">
+    <p class="eyebrow">Hours · call · vacation</p>
+    <h2>Lifestyle by specialty</h2>
+    <p>Weekly hours, vacation, call and schedule data from Marit Health's 2026 Lifestyle Balance Index (24,000+ physician submissions, at least 30 per specialty). 31 of the 51 specialties have enough data.</p>
+  </div>
+  <div class="card pad" id="scatter-card">
+    <h3>Pay vs. hours worked</h3>
+    <p class="small muted" style="margin:4px 0 10px">Up and to the left means more pay for fewer hours. Tap a dot.</p>
+    <div class="legend" id="scatter-legend"></div>
+    <div class="chart" id="scatter" style="margin-top:8px"></div>
+    <div class="readpanel" id="scatter-read" style="margin-top:12px"></div>
+  </div>
+  <div class="card pad" id="rank-card">
+    <div class="controls" style="justify-content:space-between">
+      <h3 id="rank-title">Lifestyle Balance Index</h3>
+      <label for="rank-by" style="position:absolute;left:-9999px">Rank by</label>
+      <select id="rank-by">
+        <option value="lbi">Lifestyle Balance Index</option>
+        <option value="hours">Fewest hours per week</option>
+        <option value="pto">Most vacation (PTO weeks)</option>
+        <option value="call">Lightest call</option>
+        <option value="hourly">Estimated pay per hour</option>
+      </select>
+    </div>
+    <p class="small muted" id="rank-help" style="margin:6px 0 12px"></p>
+    <div class="rank-list" id="rank-list"></div>
+  </div>
+  <div class="card pad" id="stress-card">
+    <p class="eyebrow">Stress & risk</p>
+    <h2 style="margin:4px 0 14px">Burnout and lawsuits</h2>
+    <div class="two-col" id="stress-lists"></div>
+  </div>
+</section>
+
+<!-- COMPARE -->
+<section class="view" id="view-compare" hidden>
+  <div class="section-head">
+    <p class="eyebrow">Side by side · 20 years</p>
+    <h2>Compare specialties</h2>
+    <p>Pick up to three. The timeline starts on day one of med school and runs 20 years, through training and into practice.</p>
+  </div>
+  <div class="card pad">
+    <div class="cmp-pickers">
+      <label>Specialty A<select id="cmp-a"></select></label>
+      <label>Specialty B<select id="cmp-b"></select></label>
+      <label>Specialty C<select id="cmp-c"></select></label>
+      <label>Med school starts<input class="input" id="cmp-year" type="number" min="2000" max="2060" value="2026"></label>
+    </div>
+  </div>
+  <div class="card pad"><div class="table-wrap" id="cmp-table"></div></div>
+  <div class="card pad">
+    <h3>Training timeline</h3>
+    <p class="small muted" style="margin:4px 0 12px">Med school (4 years), then residency and fellowship (typical minimum), then practice as an attending.</p>
+    <div class="tl" id="cmp-timeline"></div>
+  </div>
+  <div class="card pad">
+    <h3>Running total of pay</h3>
+    <p class="small muted" style="margin:4px 0 10px">Gross pay before taxes, $0 during med school, average resident salaries by training year (AAMC 2025), then average attending pay (Doximity 2026). It leaves out loans, taxes, raises and the lower pay common in a first attending job.</p>
+    <div class="legend" id="cmp-legend"></div>
+    <div class="chart" id="cmp-chart" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- CHANCE ME -->
+<section class="view" id="view-chance" hidden>
+  <div class="section-head">
+    <p class="eyebrow">Chance me</p>
+    <h2>What are my odds?</h2>
+    <p>Estimates built from national data. Your real odds depend on things no calculator sees, like your interviews, programs and story.</p>
+  </div>
+  <div class="seg" role="group" aria-label="Choose a calculator">
+    <button type="button" id="mode-res" aria-pressed="true">Residency match</button>
+    <button type="button" id="mode-med" aria-pressed="false">Med school admission</button>
+  </div>
+
+  <div id="panel-res" class="quiz-layout">
+    <div class="card pad form">
+      <h3>Your application</h3>
+      <div class="row">
+        <label>Specialty<select id="ch-spec"></select></label>
+        <label>You are a<select id="ch-type"><option value="md">U.S. MD senior</option><option value="do">U.S. DO senior</option></select></label>
+      </div>
+      <label id="ch-step-wrap">USMLE Step 2 CK score: <span class="mono" id="ch-step-val">250</span>
+        <input type="range" id="ch-step" min="210" max="285" step="1" value="250">
+      </label>
+      <div class="row">
+        <label>Research, compared with others applying<select id="ch-res"><option value="low">Less than typical</option><option value="mid" selected>About typical</option><option value="high">More than typical</option></select></label>
+        <label>Letters of recommendation<select id="ch-lor"><option value="weak">Generic or weak</option><option value="solid" selected>Solid</option><option value="strong">Strong, from the specialty</option><option value="top">Exceptional, from known names</option></select></label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="ch-aoa"> AOA, or top-quarter class rank</label>
+        <label><input type="checkbox" id="ch-away"> Rotated at a program you are applying to (home or away)</label>
+        <label><input type="checkbox" id="ch-broad" checked> Applying broadly, with a backup plan</label>
+      </div>
+    </div>
+    <div class="card pad" id="ch-out">
+      <div class="big-odds">
+        <svg class="ring" viewBox="0 0 132 132" role="img" aria-labelledby="ring-label"><title id="ring-label">Estimated chance</title>
+          <circle class="bg" cx="66" cy="66" r="54" fill="none" stroke-width="14"/>
+          <circle class="fg" id="ring-fg" cx="66" cy="66" r="54" fill="none" stroke-width="14" stroke-linecap="round" transform="rotate(-90 66 66)" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+          <text id="ring-txt" x="66" y="74" text-anchor="middle" font-size="26">—</text>
+        </svg>
+        <div style="display:grid; gap:4px; flex:1; min-width:180px">
+          <p class="eyebrow">Estimated chance to match</p>
+          <h3 id="ch-headline">—</h3>
+          <p class="small muted" id="ch-sub"></p>
+        </div>
+      </div>
+      <div class="steps" id="ch-steps" style="margin-top:16px"></div>
+      <div class="chart" id="ch-dist" style="margin-top:14px"></div>
+      <div class="legend" id="ch-dist-legend" style="margin-top:6px"></div>
+      <p class="note" style="margin-top:14px">How this works: start from the share of U.S. seniors who matched when this specialty was their first choice (NRMP 2026). For MD seniors, we compare your Step 2 CK with the scores of matched and unmatched applicants. Then we nudge for your profile. NRMP does not publish exact effects for research, letters, AOA or rotations, so those nudges are our rough assumptions.</p>
+    </div>
+  </div>
+
+  <div id="panel-med" hidden>
+    <div class="quiz-layout">
+      <div class="card pad form">
+        <h3>Your numbers</h3>
+        <div class="row">
+          <label>Total GPA<select id="md-gpa"></select></label>
+          <label>MCAT total<select id="md-mcat"></select></label>
+        </div>
+        <div class="big-odds" style="margin-top:6px">
+          <svg class="ring" viewBox="0 0 132 132" role="img" aria-labelledby="ring2-label"><title id="ring2-label">Acceptance rate</title>
+            <circle class="bg" cx="66" cy="66" r="54" fill="none" stroke-width="14"/>
+            <circle class="fg" id="ring2-fg" cx="66" cy="66" r="54" fill="none" stroke-width="14" stroke-linecap="round" transform="rotate(-90 66 66)" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+            <text id="ring2-txt" x="66" y="74" text-anchor="middle" font-size="26">—</text>
+          </svg>
+          <div style="display:grid; gap:4px; flex:1; min-width:180px">
+            <p class="eyebrow">Accepted to at least one MD school</p>
+            <h3 id="md-headline">—</h3>
+            <p class="small muted" id="md-sub"></p>
+          </div>
+        </div>
+        <p class="note">This is the share of past applicants with your GPA and MCAT range who were accepted to at least one U.S. MD school (AAMC Table A-23, three application cycles combined: 2023–24 through 2025–26, 155,940 applicants). It is not a prediction for any single school, and it leaves out DO schools, clinical hours, research, essays and interviews.</p>
+      </div>
+      <div class="card pad">
+        <h3>The full grid</h3>
+        <p class="small muted" style="margin:4px 0 10px">Acceptance rate by GPA (rows) and MCAT (columns). Tap a cell to select it.</p>
+        <div class="table-wrap" id="md-grid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HPSP -->
+<section class="view" id="view-hpsp" hidden>
+  <div class="section-head">
+    <p class="eyebrow">Military · Army · Navy · Air Force</p>
+    <h2>HPSP students: your path</h2>
+    <p>The Health Professions Scholarship Program pays for med school in exchange for active-duty service. Here is what it pays, what you owe, and when you would be free to practice as a civilian.</p>
+  </div>
+  <div class="facts" id="hpsp-facts"></div>
+
+  <div class="card pad">
+    <h3>Estimate your timeline</h3>
+    <p class="small muted" style="margin:4px 0 12px">A simplified model of the published rules. Your service commitment paperwork is the final word.</p>
+    <div class="form">
+      <div class="row">
+        <label>Specialty<select id="hp-spec"></select></label>
+        <label>Scholarship length<select id="hp-yrs"><option value="4">4 years</option><option value="3">3 years</option></select></label>
+        <label>Med school starts<input class="input" id="hp-year" type="number" min="2000" max="2060" value="2026"></label>
+      </div>
+      <label>Path after med school<select id="hp-path">
+        <option value="military">Military residency straight through, then payback</option>
+        <option value="tour">Internship, then an operational tour (GMO or flight surgeon) for payback, then a civilian residency</option>
+      </select></label>
+    </div>
+    <div class="tl" id="hp-tl" style="margin-top:16px"></div>
+    <div class="dates" id="hp-dates" style="margin-top:14px"></div>
+    <p class="note red" id="hp-note" style="margin-top:14px"></p>
+  </div>
+
+  <div class="card pad">
+    <h3>Military pay as a new doctor</h3>
+    <div class="kv" style="margin-top:10px">
+      <div><p class="k">O-3 base pay, 2 years or less</p><p class="v">$5,534.10/mo</p><p class="s">2026 DoD pay table</p></div>
+      <div><p class="k">O-3 base pay, over 2 years</p><p class="v">$6,273.90/mo</p><p class="s">2026 DoD pay table</p></div>
+      <div><p class="k">Your years of service for pay</p><p class="v">Start at 0</p><p class="s">HPSP school years don't count (10 U.S.C. § 2126)</p></div>
+    </div>
+    <p class="small muted" style="margin-top:12px">On top of base pay, you get a tax-free housing allowance (BAH, set by duty location) and food allowance (BAS). Attending physicians also get medical special pays, which vary a lot by specialty. Check the current DFAS special pay tables for exact amounts.</p>
+  </div>
+</section>
+
+<!-- SOURCES -->
+<section class="view" id="view-sources" hidden>
+  <div class="section-head">
+    <p class="eyebrow">Every number has a source</p>
+    <h2>Sources and methods</h2>
+    <p>All data was checked in November 2026. Where two sources disagree, the page says which one it uses.</p>
+  </div>
+  <div class="src-list" id="src-list"></div>
+  <div class="card pad">
+    <h3>Open source</h3>
+    <p style="margin-top:6px; max-width:65ch">SpecialtyScope is a single HTML file released under the MIT License. Copy it, host it, translate it or improve it. Please keep the source links and update the data each year when NRMP, AAMC and Doximity publish new reports.</p>
+  </div>
+  <p class="disclaimer">Educational estimates only. This is not career, financial, legal or medical advice. SpecialtyScope is not affiliated with or endorsed by NRMP, AAMC, Doximity, Medscape, Marit Health, the Department of Defense or any military branch. Averages hide big differences by location, practice type and experience.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>SpecialtyScope</b> · Free and open source (MIT). Data checked November 2026. Built for med students, by med students.</p>
+  </div>
+</footer>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-backdrop" data-close></div>
+  <div class="sheet-panel">
+    <button class="sheet-close" type="button" data-close aria-label="Close">×</button>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script>
+const SPECIALTIES=[{"id": "neurosurgery", "name": "Neurosurgery", "cat": "surg", "pay": 829161, "train": 7, "proc": 2, "pop": "all", "pace": "acute", "setting": "or", "medscape": null, "life": {"lbi": 0.5, "hours": 56.6, "sched": 0.67, "call": 1.07, "fte": 87, "pto": 4.6, "src": "Neurosurgery"}, "nrmp": {"name": "Neurological Surgery", "md": 70.6, "do": 50.0, "s2": 256, "q1": 249, "q3": 264, "um": 244, "comlex": 564}, "short": "Neurosurg", "work": {"people": 0.6, "acuity": 0.95, "cont": 0.1, "hands": 1.0, "heavy": 0.8, "pattern": 0.25}, "suedYr": 19.1, "pubs": 37.4}, {"id": "thoracic", "name": "Thoracic Surgery", "cat": "surg", "pay": 749707, "train": 6, "proc": 2, "pop": "adult", "pace": "acute", "setting": "or", "medscape": null, "nrmp": {"name": "Thoracic Surgery (Integrated)", "md": 64.0, "do": null, "s2": 260, "q1": 256, "q3": 265, "um": 257, "comlex": null}, "short": "Thoracic", "work": {"people": 0.6, "acuity": 0.95, "cont": 0.1, "hands": 1.0, "heavy": 0.7, "pattern": 0.25}, "suedYr": 18.9}, {"id": "ortho", "name": "Orthopaedic Surgery", "cat": "surg", "pay": 696852, "train": 5, "proc": 2, "pop": "all", "pace": "mix", "setting": "or", "medscape": 611000, "life": {"lbi": 0.82, "hours": 50.7, "sched": 0.95, "call": 1.02, "fte": 92, "pto": 4.8, "src": "Orthopedic Surgery"}, "nrmp": {"name": "Orthopaedic Surgery", "md": 69.0, "do": 45.3, "s2": 259, "q1": 250, "q3": 266, "um": 251, "comlex": 623}, "short": "Ortho", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.3, "pattern": 0.25}, "sued": 47.2, "pubs": 23.8}, {"id": "ir", "name": "Interventional Radiology", "cat": "img", "pay": 634658, "train": 6, "proc": 2, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": null, "nrmp": {"name": "Interventional Radiology (Integrated)", "md": 91.2, "do": 66.7, "s2": 255, "q1": 246, "q3": 264, "um": 252, "comlex": 560}, "short": "IR", "work": {"people": 0.5, "acuity": 0.6, "cont": 0.25, "hands": 1.0, "heavy": 0.45, "pattern": 0.7}, "pubs": 15.8}, {"id": "pedsurg", "name": "Pediatric Surgery", "cat": "surg", "pay": 627126, "train": 7, "proc": 2, "pop": "peds", "pace": "acute", "setting": "or", "medscape": null, "short": "Peds Surg", "work": {"people": 0.6, "acuity": 0.95, "cont": 0.1, "hands": 1.0, "heavy": 0.7, "pattern": 0.25}}, {"id": "plastics", "name": "Plastic Surgery", "cat": "surg", "pay": 625757, "train": 6, "proc": 2, "pop": "all", "pace": "mix", "setting": "or", "medscape": 554000, "life": {"lbi": 0.85, "hours": 52.2, "sched": 0.96, "call": 0.97, "fte": 89, "pto": 4.7, "src": "Plastic Surgery"}, "nrmp": {"name": "Plastic Surgery (Integrated)", "md": 65.4, "do": 33.3, "s2": 259, "q1": 250, "q3": 265, "um": 251, "comlex": null}, "short": "Plastics", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.3, "pattern": 0.25}, "pubs": 34.7}, {"id": "radonc", "name": "Radiation Oncology", "cat": "img", "pay": 613837, "train": 5, "proc": 1, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": null, "life": {"lbi": 1.2, "hours": 45.9, "sched": 1.15, "call": 0.97, "fte": 90, "pto": 6.0, "src": "Radiation Oncology"}, "nrmp": {"name": "Radiation Oncology", "md": 91.8, "do": 95.2, "s2": 251, "q1": 238, "q3": 261, "um": null, "comlex": 553}, "short": "Rad Onc", "work": {"people": 0.75, "acuity": 0.15, "cont": 0.95, "hands": 0.5, "heavy": 0.7, "pattern": 0.5}, "pubs": 15.9}, {"id": "radiology", "name": "Diagnostic Radiology", "cat": "img", "pay": 609684, "train": 5, "proc": 1, "pop": "none", "pace": "mix", "setting": "lab", "medscape": 571000, "life": {"lbi": 1.0, "hours": 46.2, "sched": 0.96, "call": 1.05, "fte": 91, "pto": 9.9, "src": "Radiology"}, "nrmp": {"name": "Radiology-Diagnostic", "md": 94.1, "do": 83.5, "s2": 257, "q1": 249, "q3": 265, "um": 242, "comlex": 603}, "short": "Radiology", "work": {"people": 0.2, "acuity": 0.4, "cont": 0.1, "hands": 0.5, "heavy": 0.2, "pattern": 1}, "burnout": 45.2, "sued": 40.2, "pubs": 12.0}, {"id": "cardiology", "name": "Cardiology", "cat": "imsub", "pay": 604635, "train": 6, "proc": 1, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": 575000, "life": {"lbi": 0.72, "hours": 52.4, "sched": 0.92, "call": 1.11, "fte": 88, "pto": 5.5, "src": "Cardiology"}, "short": "Cardiology", "work": {"people": 0.75, "acuity": 0.6, "cont": 0.5, "hands": 0.5, "heavy": 0.5, "pattern": 0.45}, "burnout": 43.5, "sued": 32.1}, {"id": "vascular", "name": "Vascular Surgery", "cat": "surg", "pay": 600520, "train": 5, "proc": 2, "pop": "adult", "pace": "acute", "setting": "or", "medscape": null, "nrmp": {"name": "Vascular Surgery (Integrated)", "md": 85.7, "do": 50.0, "s2": 256, "q1": 248, "q3": 264, "um": 235, "comlex": 623}, "short": "Vascular", "work": {"people": 0.6, "acuity": 0.95, "cont": 0.1, "hands": 1.0, "heavy": 0.6, "pattern": 0.25}, "pubs": 12.8}, {"id": "urology", "name": "Urology", "cat": "surg", "pay": 566740, "train": 5, "proc": 2, "pop": "all", "pace": "mix", "setting": "or", "medscape": 535000, "life": {"lbi": 0.87, "hours": 50.2, "sched": 0.99, "call": 1.02, "fte": 91, "pto": 5.3, "src": "Urology"}, "short": "Urology", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.35, "pattern": 0.25}, "burnout": 49.5, "sued": 38.3}, {"id": "anesthesiology", "name": "Anesthesiology", "cat": "acute", "pay": 557131, "train": 4, "proc": 1, "pop": "all", "pace": "acute", "setting": "or", "medscape": 543000, "life": {"lbi": 0.64, "hours": 47.4, "sched": 0.79, "call": 1.22, "fte": 93, "pto": 7.6, "src": "Anesthesiology"}, "nrmp": {"name": "Anesthesiology", "md": 87.4, "do": 72.5, "s2": 255, "q1": 247, "q3": 263, "um": 239, "comlex": 585}, "short": "Anesthesia", "work": {"people": 0.45, "acuity": 0.85, "cont": 0.05, "hands": 0.5, "heavy": 0.45, "pattern": 0.25}, "sued": 28.6, "pubs": 9.0}, {"id": "ent", "name": "Otolaryngology (ENT)", "cat": "surg", "pay": 549810, "train": 5, "proc": 2, "pop": "all", "pace": "mix", "setting": "or", "medscape": 508000, "life": {"lbi": 0.98, "hours": 47.5, "sched": 1.04, "call": 1.0, "fte": 90, "pto": 4.5, "src": "Otolaryngology"}, "nrmp": {"name": "Otolaryngology", "md": 76.8, "do": 42.6, "s2": 261, "q1": 250, "q3": 266, "um": 249, "comlex": 603}, "short": "ENT", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.4, "pattern": 0.25}, "sued": 39.3, "pubs": 20.0}, {"id": "gi", "name": "Gastroenterology", "cat": "imsub", "pay": 531345, "train": 6, "proc": 1, "pop": "adult", "pace": "mix", "setting": "clinic", "medscape": 530000, "life": {"lbi": 0.94, "hours": 46.7, "sched": 1.01, "call": 1.02, "fte": 93, "pto": 5.2, "src": "Gastroenterology"}, "short": "GI", "work": {"people": 0.9, "acuity": 0.55, "cont": 0.5, "hands": 0.5, "heavy": 0.35, "pattern": 0.25}, "burnout": 43.5, "sued": 27.0}, {"id": "oncology", "name": "Oncology", "cat": "imsub", "pay": 519715, "train": 6, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 464000, "life": {"lbi": 0.88, "hours": 47.6, "sched": 1.07, "call": 1.2, "fte": 84, "pto": 5.0, "src": "Hematology Oncology"}, "short": "Oncology", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.9, "pattern": 0.25}, "burnout": 49.3, "sued": 8.0}, {"id": "gensurg", "name": "General Surgery", "cat": "surg", "pay": 501003, "train": 5, "proc": 2, "pop": "adult", "pace": "acute", "setting": "or", "medscape": 442000, "life": {"lbi": 0.61, "hours": 53.7, "sched": 0.76, "call": 1.07, "fte": 87, "pto": 4.9, "src": "Surgery"}, "nrmp": {"name": "Surgery-General", "md": 80.3, "do": 69.9, "s2": 255, "q1": 245, "q3": 262, "um": 238, "comlex": 590}, "short": "Gen Surg", "work": {"people": 0.6, "acuity": 0.95, "cont": 0.1, "hands": 1.0, "heavy": 0.6, "pattern": 0.25}, "burnout": 43.8, "sued": 59.3, "pubs": 10.9}, {"id": "derm", "name": "Dermatology", "cat": "med", "pay": 497509, "train": 4, "proc": 1, "pop": "all", "pace": "cont", "setting": "clinic", "medscape": 448000, "life": {"lbi": 1.44, "hours": 38.8, "sched": 1.15, "call": 0.9, "fte": 95, "pto": 4.6, "src": "Dermatology"}, "nrmp": {"name": "Dermatology", "md": 62.6, "do": 36.0, "s2": 258, "q1": 251, "q3": 266, "um": 252, "comlex": 631}, "short": "Derm", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.75, "hands": 0.5, "heavy": 0.15, "pattern": 0.75}, "burnout": 31.5, "sued": 13.1, "pubs": 27.7}, {"id": "colorectal", "name": "Colon & Rectal Surgery", "cat": "surg", "pay": 492802, "train": 6, "proc": 2, "pop": "adult", "pace": "mix", "setting": "or", "medscape": null, "short": "Colorectal", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.4, "pattern": 0.25}}, {"id": "ophtho", "name": "Ophthalmology", "cat": "surg", "pay": 487438, "train": 4, "proc": 2, "pop": "all", "pace": "mix", "setting": "clinic", "medscape": 446000, "life": {"lbi": 1.22, "hours": 42.0, "sched": 1.13, "call": 0.98, "fte": 91, "pto": 4.7, "src": "Ophthalmology"}, "short": "Ophtho", "work": {"people": 0.7, "acuity": 0.55, "cont": 0.6, "hands": 1.0, "heavy": 0.2, "pattern": 0.55}, "burnout": 25.8, "sued": 29.6}, {"id": "hematology", "name": "Hematology", "cat": "imsub", "pay": 446700, "train": 6, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 464000, "life": {"lbi": 0.88, "hours": 47.6, "sched": 1.07, "call": 1.2, "fte": 84, "pto": 5.0, "src": "Hematology Oncology"}, "short": "Heme", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.8, "pattern": 0.25}, "burnout": 49.3, "sued": 8.0}, {"id": "pulm", "name": "Pulmonology / Critical Care", "cat": "imsub", "pay": 441472, "train": 6, "proc": 1, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": 395000, "life": {"lbi": 0.81, "hours": 47.1, "sched": 0.95, "call": 1.11, "fte": 92, "pto": 4.7, "src": "Pulmonology"}, "short": "Pulm/CC", "work": {"people": 0.75, "acuity": 0.75, "cont": 0.5, "hands": 0.5, "heavy": 0.75, "pattern": 0.25}}, {"id": "em", "name": "Emergency Medicine", "cat": "acute", "pay": 423723, "train": 3, "proc": 1, "pop": "all", "pace": "acute", "setting": "hospital", "medscape": 421000, "life": {"lbi": 0.95, "hours": 35.5, "sched": 0.61, "call": 0.86, "fte": 75, "pto": 3.7, "src": "Emergency Medicine"}, "nrmp": {"name": "Emergency Medicine", "md": 96.3, "do": 95.1, "s2": 249, "q1": 240, "q3": 258, "um": 229, "comlex": 523}, "short": "EM", "work": {"people": 0.8, "acuity": 0.95, "cont": 0.1, "hands": 0.5, "heavy": 0.75, "pattern": 0.25}, "burnout": 49.8, "sued": 46.8, "pubs": 5.7}, {"id": "obgyn", "name": "Obstetrics & Gynecology", "cat": "surg", "pay": 420859, "train": 4, "proc": 2, "pop": "adult", "pace": "mix", "setting": "or", "medscape": 390000, "life": {"lbi": 0.64, "hours": 49.6, "sched": 0.83, "call": 1.18, "fte": 89, "pto": 4.9, "src": "Obstetrics & Gynecology"}, "nrmp": {"name": "Obstetrics and Gynecology", "md": 87.2, "do": 71.0, "s2": 253, "q1": 244, "q3": 261, "um": 245, "comlex": 563}, "short": "OB/GYN", "work": {"people": 0.6, "acuity": 0.55, "cont": 0.5, "hands": 1.0, "heavy": 0.6, "pattern": 0.25}, "burnout": 45.7, "sued": 62.4, "pubs": 9.0}, {"id": "pathology", "name": "Pathology", "cat": "img", "pay": 410039, "train": 4, "proc": 0, "pop": "none", "pace": "mix", "setting": "lab", "medscape": 394000, "life": {"lbi": 1.12, "hours": 45.3, "sched": 1.09, "call": 1.03, "fte": 82, "pto": 5.6, "src": "Pathology"}, "nrmp": {"name": "Pathology-Anatomic and Clinical", "md": 92.8, "do": 78.3, "s2": 247, "q1": 240, "q3": 258, "um": 237, "comlex": 511}, "short": "Path", "work": {"people": 0.1, "acuity": 0.15, "cont": 0.05, "hands": 0.0, "heavy": 0.2, "pattern": 1}, "burnout": 28.3, "sued": 11.0, "pubs": 8.4}, {"id": "nephrology", "name": "Nephrology", "cat": "imsub", "pay": 385965, "train": 5, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 359000, "life": {"lbi": 0.72, "hours": 48.4, "sched": 0.87, "call": 1.13, "fte": 87, "pto": 5.0, "src": "Nephrology"}, "short": "Nephro", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.5, "pattern": 0.25}, "burnout": 29.3, "sued": 18.3}, {"id": "pmr", "name": "Physical Medicine & Rehab", "cat": "med", "pay": 376234, "train": 4, "proc": 1, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 359000, "life": {"lbi": 1.27, "hours": 43.1, "sched": 1.12, "call": 0.92, "fte": 90, "pto": 4.8, "src": "Physical Medicine & Rehabilitation"}, "nrmp": {"name": "Physical Medicine and Rehabilitation", "md": 82.4, "do": 69.4, "s2": 251, "q1": 241, "q3": 259, "um": 237, "comlex": 543}, "short": "PM&R", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.8, "hands": 0.5, "heavy": 0.4, "pattern": 0.25}, "pubs": 8.6}, {"id": "neurology", "name": "Neurology", "cat": "med", "pay": 371087, "train": 4, "proc": 0, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": 341000, "life": {"lbi": 0.97, "hours": 46.8, "sched": 0.99, "call": 1.01, "fte": 85, "pto": 5.1, "src": "Neurology"}, "nrmp": {"name": "Neurology", "md": 93.1, "do": 81.7, "s2": 252, "q1": 242, "q3": 261, "um": 232, "comlex": 559}, "short": "Neuro", "work": {"people": 0.75, "acuity": 0.55, "cont": 0.5, "hands": 0.0, "heavy": 0.6, "pattern": 0.6}, "sued": 22.6, "pubs": 8.8}, {"id": "pedscards", "name": "Pediatric Cardiology", "cat": "peds", "pay": 365395, "train": 6, "proc": 1, "pop": "peds", "pace": "cont", "setting": "hospital", "medscape": null, "short": "Peds Cards", "work": {"people": 0.75, "acuity": 0.15, "cont": 0.95, "hands": 0.5, "heavy": 0.7, "pattern": 0.25}}, {"id": "neonatology", "name": "Neonatology", "cat": "peds", "pay": 364388, "train": 6, "proc": 1, "pop": "peds", "pace": "acute", "setting": "hospital", "medscape": null, "short": "NICU", "work": {"people": 0.6, "acuity": 0.9, "cont": 0.1, "hands": 0.5, "heavy": 0.85, "pattern": 0.25}}, {"id": "psychiatry", "name": "Psychiatry", "cat": "med", "pay": 350786, "train": 4, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 331000, "life": {"lbi": 1.33, "hours": 40.9, "sched": 1.12, "call": 0.95, "fte": 86, "pto": 4.7, "src": "Psychiatry"}, "nrmp": {"name": "Psychiatry", "md": 93.3, "do": 89.4, "s2": 247, "q1": 236, "q3": 256, "um": 234, "comlex": 513}, "short": "Psych", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.7, "pattern": 0.25}, "burnout": 31.6, "sued": 10.9, "pubs": 7.5}, {"id": "im", "name": "Internal Medicine", "cat": "primary", "pay": 339274, "train": 3, "proc": 0, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": 307000, "life": {"lbi": 1.18, "hours": 44.0, "sched": 1.07, "call": 0.94, "fte": 87, "pto": 4.9, "src": "Internal Medicine"}, "nrmp": {"name": "Internal Medicine", "md": 97.4, "do": 95.4, "s2": 254, "q1": 243, "q3": 262, "um": 233, "comlex": 530}, "short": "Internal Med", "work": {"people": 0.75, "acuity": 0.55, "cont": 0.5, "hands": 0.0, "heavy": 0.5, "pattern": 0.25}, "sued": 30.9, "pubs": 8.7}, {"id": "id", "name": "Infectious Disease", "cat": "imsub", "pay": 337353, "train": 5, "proc": 0, "pop": "adult", "pace": "mix", "setting": "hospital", "medscape": 282000, "life": {"lbi": 0.92, "hours": 48.0, "sched": 1.0, "call": 1.12, "fte": 74, "pto": 4.7, "src": "Infectious Disease"}, "short": "ID", "work": {"people": 0.75, "acuity": 0.55, "cont": 0.5, "hands": 0.0, "heavy": 0.5, "pattern": 0.6}, "burnout": 23.3}, {"id": "allergy", "name": "Allergy & Immunology", "cat": "imsub", "pay": 335978, "train": 5, "proc": 0, "pop": "all", "pace": "cont", "setting": "clinic", "medscape": 310000, "life": {"lbi": 1.39, "hours": 40.2, "sched": 1.15, "call": 0.93, "fte": 87, "pto": 4.4, "src": "Allergy & Immunology"}, "short": "Allergy", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.2, "pattern": 0.25}, "sued": 7.1}, {"id": "pedsem", "name": "Pediatric Emergency Medicine", "cat": "peds", "pay": 332579, "train": 6, "proc": 1, "pop": "peds", "pace": "acute", "setting": "hospital", "medscape": null, "short": "Peds EM", "work": {"people": 0.75, "acuity": 0.95, "cont": 0.1, "hands": 0.5, "heavy": 0.75, "pattern": 0.25}}, {"id": "occmed", "name": "Occupational Medicine", "cat": "med", "pay": 329380, "train": 3, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Occ Med", "work": {"people": 0.7, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.15, "pattern": 0.25}}, {"id": "fm", "name": "Family Medicine", "cat": "primary", "pay": 325040, "train": 3, "proc": 0, "pop": "all", "pace": "cont", "setting": "clinic", "medscape": 288000, "life": {"lbi": 1.3, "hours": 41.8, "sched": 1.12, "call": 0.93, "fte": 88, "pto": 4.8, "src": "Family Medicine"}, "nrmp": {"name": "Family Medicine", "md": 99.1, "do": 97.8, "s2": 244, "q1": 233, "q3": 254, "um": 230, "comlex": 493}, "short": "Family Med", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.45, "pattern": 0.25}, "burnout": 45.0, "sued": 32.0, "pubs": 4.2}, {"id": "rheum", "name": "Rheumatology", "cat": "imsub", "pay": 321778, "train": 5, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 284000, "life": {"lbi": 1.34, "hours": 40.6, "sched": 1.16, "call": 0.97, "fte": 89, "pto": 5.0, "src": "Rheumatology"}, "short": "Rheum", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.35, "pattern": 0.55}, "sued": 22.2}, {"id": "medpeds", "name": "Internal Medicine–Pediatrics", "cat": "primary", "pay": 319995, "train": 4, "proc": 0, "pop": "all", "pace": "cont", "setting": "clinic", "medscape": null, "nrmp": {"name": "Internal Medicine/Pediatrics", "md": 89.9, "do": 76.5, "s2": 255, "q1": 246, "q3": 262, "um": 249, "comlex": 567}, "short": "Med-Peds", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}, "pubs": 6.9}, {"id": "pedsgi", "name": "Pediatric Gastroenterology", "cat": "peds", "pay": 311433, "train": 6, "proc": 1, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds GI", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.5, "heavy": 0.4, "pattern": 0.25}}, {"id": "endo", "name": "Endocrinology", "cat": "imsub", "pay": 309782, "train": 5, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": 284000, "life": {"lbi": 1.22, "hours": 42.5, "sched": 1.13, "call": 0.98, "fte": 90, "pto": 5.0, "src": "Endocrinology"}, "short": "Endo", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.3, "pattern": 0.4}, "sued": 8.6}, {"id": "childneuro", "name": "Child Neurology", "cat": "peds", "pay": 309593, "train": 5, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "nrmp": {"name": "Child Neurology", "md": 97.2, "do": 96.7, "s2": 251, "q1": 240, "q3": 260, "um": null, "comlex": 547}, "short": "Child Neuro", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.55, "pattern": 0.5}, "pubs": 9.8}, {"id": "geriatrics", "name": "Geriatrics", "cat": "imsub", "pay": 304411, "train": 4, "proc": 0, "pop": "adult", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Geriatrics", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.6, "pattern": 0.25}}, {"id": "pedspulm", "name": "Pediatric Pulmonology", "cat": "peds", "pay": 278452, "train": 6, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds Pulm", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}}, {"id": "genetics", "name": "Medical Genetics", "cat": "med", "pay": 273826, "train": 4, "proc": 0, "pop": "all", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Genetics", "work": {"people": 0.75, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.5, "pattern": 0.6}}, {"id": "peds", "name": "Pediatrics", "cat": "primary", "pay": 273665, "train": 3, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": 266000, "life": {"lbi": 0.92, "hours": 43.6, "sched": 0.94, "call": 1.07, "fte": 86, "pto": 4.6, "src": "Pediatrics"}, "nrmp": {"name": "Pediatrics", "md": 99.4, "do": 99.0, "s2": 249, "q1": 239, "q3": 259, "um": 243, "comlex": 511}, "short": "Pediatrics", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}, "sued": 17.8, "pubs": 6.4}, {"id": "pedsheme", "name": "Pediatric Hematology & Oncology", "cat": "peds", "pay": 271021, "train": 6, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds Heme/Onc", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.95, "pattern": 0.25}}, {"id": "pedsneph", "name": "Pediatric Nephrology", "cat": "peds", "pay": 269825, "train": 6, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds Nephro", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}}, {"id": "prevmed", "name": "Preventive Medicine", "cat": "med", "pay": 265825, "train": 3, "proc": 0, "pop": "none", "pace": "cont", "setting": "clinic", "medscape": 277000, "life": {"lbi": 1.5, "hours": 40.5, "sched": 1.15, "call": 0.9, "fte": 79, "pto": 4.7, "src": "Preventive Medicine"}, "short": "Prev Med", "work": {"people": 0.35, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.15, "pattern": 0.25}}, {"id": "pedsendo", "name": "Pediatric Endocrinology", "cat": "peds", "pay": 242274, "train": 6, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds Endo", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}}, {"id": "pedsrheum", "name": "Pediatric Rheumatology", "cat": "peds", "pay": 236011, "train": 6, "proc": 0, "pop": "peds", "pace": "cont", "setting": "clinic", "medscape": null, "short": "Peds Rheum", "work": {"people": 0.9, "acuity": 0.15, "cont": 0.95, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}}, {"id": "pedsid", "name": "Pediatric Infectious Disease", "cat": "peds", "pay": 217819, "train": 6, "proc": 0, "pop": "peds", "pace": "mix", "setting": "hospital", "medscape": null, "short": "Peds ID", "work": {"people": 0.75, "acuity": 0.55, "cont": 0.5, "hands": 0.0, "heavy": 0.4, "pattern": 0.25}}];
+const AAMC={"rows": ["3.80–4.00", "3.60–3.79", "3.40–3.59", "3.20–3.39", "3.00–3.19", "2.80–2.99", "2.60–2.79", "2.40–2.59", "2.20–2.39", "2.00–2.19"], "rowTotals": [63.7, 42.4, 29.7, 20.8, 15.9, 11.5, 8.4, 6.1, 2.6, 4.8], "cols": ["<486", "486–489", "490–493", "494–497", "498–501", "502–505", "506–509", "510–513", "514–517", ">517"], "colTotals": [0.6, 1.8, 4.0, 11.1, 22.2, 35.4, 47.1, 62.4, 71.2, 79.9], "v": [[2.8, 3.4, 8, 18.5, 30.6, 44.9, 57.1, 70.5, 77.2, 83.3], [1.6, 2.8, 4.4, 11.8, 22.3, 34.7, 45.4, 60, 66.7, 71.3], [0.5, 0.8, 4.4, 9.7, 20, 30.3, 36.7, 48.7, 56.5, 66.4], [0.3, 1.7, 2.8, 7.8, 17.5, 24.7, 31.8, 42.3, 45.5, 60.7], [0.4, 1.7, 2.3, 6.5, 15.4, 23.2, 28.4, 37.4, 43.3, 46.5], [0.3, 1.3, 1.6, 5.6, 10.8, 23.3, 27.7, 39, 36.4, 41.7], [0.2, 1.7, 1.9, 4.5, 10.4, 17.9, 22.1, 33.8, 32, 35.7], [0.5, 0, 1.8, 1.6, 12.5, 17.9, 21.4, 37.5, 53.8, null], [0, 3.4, 1.6, 4.5, 3.7, 5.3, 14.3, 9.1, null, null], [0, 0, 0, 5, 11.8, 21.4, null, null, null, null]]};
+const PGY=[68166, 70499, 73301, 77593, 81807, 84744, 89187, 94215];
+
+</script>
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const el=(tag,attrs={},...kids)=>{const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(v==null||v===false)continue;if(k==='class')n.className=v;else if(k==='style')n.setAttribute('style',v);else if(k==='html')n.innerHTML=v;else if(k.startsWith('on'))n.addEventListener(k.slice(2),v);else n.setAttribute(k,v===true?'':v);}for(const c of kids.flat()){if(c==null||c===false)continue;n.append(c.nodeType?c:document.createTextNode(String(c)));}return n;};
+const SVGNS='http://www.w3.org/2000/svg';
+const sv=(tag,attrs={},text)=>{const n=document.createElementNS(SVGNS,tag);for(const[k,v]of Object.entries(attrs))if(v!=null)n.setAttribute(k,v);if(text!=null)n.textContent=text;return n;};
+const money=n=>'$'+Math.round(n).toLocaleString('en-US');
+const kmoney=n=>n>=1e6?'$'+(n/1e6).toFixed(2)+'M':'$'+Math.round(n/1000)+'K';
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const store={get(k,d){try{const v=localStorage.getItem('sscope:'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem('sscope:'+k,JSON.stringify(v));}catch(e){}}};
+
+const CATS={
+  surg:{label:'Surgical',color:'var(--c-surg)'},
+  imsub:{label:'Internal medicine subspecialty',color:'var(--c-imsub)'},
+  med:{label:'Medical specialty',color:'var(--c-med)'},
+  primary:{label:'Primary care',color:'var(--c-primary)'},
+  peds:{label:'Pediatric subspecialty',color:'var(--c-peds)'},
+  img:{label:'Imaging, lab & radiation',color:'var(--c-img)'},
+  acute:{label:'Acute & perioperative',color:'var(--c-acute)'}
+};
+const S=SPECIALTIES;
+const byId=Object.fromEntries(S.map(s=>[s.id,s]));
+const MAXPAY=Math.max(...S.map(s=>s.pay)), MINPAY=Math.min(...S.map(s=>s.pay));
+const chip=s=>el('span',{class:'chip',style:'color:'+CATS[s.cat].color},CATS[s.cat].label);
+const PROC=['Mostly thinking & talking','Some procedures','Surgery / major procedures'];
+const SETTING={clinic:'Clinic-based',hospital:'Hospital-based',or:'Operating room',lab:'Reading room / lab'};
+const POP={adult:'Adults',peds:'Children',all:'All ages',none:'Little direct patient care'};
+const PACE={cont:'Long-term patients',mix:'Mix of long-term and acute',acute:'Fast-paced, high acuity'};
+function pathNote(s){
+  if(s.nrmp) return null;
+  if(s.id==='ophtho') return 'Matches through the SF Match, not the NRMP Main Residency Match, so NRMP odds are not shown.';
+  if(s.id==='urology') return 'Matches through the AUA Urology Match, not the NRMP Main Residency Match, so NRMP odds are not shown.';
+  if(s.id==='pedsurg') return 'Path: General Surgery residency (5 years), then a 2-year fellowship.';
+  if(s.id==='colorectal') return 'Path: General Surgery residency (5 years), then a 1-year fellowship.';
+  if(s.cat==='imsub') return 'Path: Internal Medicine residency (3 years), then a fellowship. Fellowships match separately through the NRMP Specialties Matching Service.';
+  if(s.id==='pedsem') return 'Path: Pediatrics residency (3 years), then a 3-year fellowship. EM-trained doctors can also take a shorter route.';
+  if(s.cat==='peds') return 'Path: Pediatrics residency (3 years), then a 3-year fellowship.';
+  if(s.id==='occmed'||s.id==='prevmed') return 'Path: an intern year plus a 2-year preventive medicine residency.';
+  if(s.id==='genetics') return 'Path: a medical genetics residency, often combined with or after pediatrics or internal medicine.';
+  return null;
+}
+const hourly=s=>s.life?s.pay/(s.life.hours*(52-s.life.pto)):null;
+
+/* ---------------- Routing ---------------- */
+const VIEWS=['start','quiz','explore','lifestyle','compare','chance','hpsp','sources'];
+let current=null;
+function route(){
+  let h=(location.hash||'').slice(1); if(!VIEWS.includes(h)) h='start';
+  VIEWS.forEach(v=>{const sec=$('#view-'+v); if(sec) sec.hidden=(v!==h);});
+  $$('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.view===h?'page':'false'));
+  const act=$('.tab[aria-current="page"]'); if(act&&act.scrollIntoView){try{act.scrollIntoView({block:'nearest',inline:'center'});}catch(e){}}
+  current=h; draw(h);
+}
+function draw(h){
+  if(h==='start') renderHome();
+  if(h==='quiz') renderSelfCheck();
+  if(h==='explore') renderExplore();
+  if(h==='lifestyle') renderLifestyle();
+  if(h==='compare') renderCompare();
+  if(h==='chance') renderChance();
+  if(h==='hpsp') renderHPSP();
+  if(h==='sources') renderSources();
+}
+function go(view){ if(location.hash==='#'+view) route(); else location.hash=view; window.scrollTo(0,0); }
+window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0);});
+let rt; window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(current==='start')layoutBubbles();if(current==='lifestyle')drawScatter();if(current==='compare')drawCmpChart();if(current==='chance')renderChanceOut();},150);});
+
+/* ---------------- Home: bubbles ---------------- */
+const SUEDV=s=>s.sued!=null?clamp((65-s.sued)/60,0,1):(s.suedYr!=null?0.03:null); // 1 = low lawsuit risk
+const BURNV=s=>s.burnout!=null?clamp((52-s.burnout)/30,0,1):null;               // 1 = low burnout
+const LIFEV=s=>s.life?clamp((s.life.lbi-0.45)/1.05,0,1):null;                   // 1 = best balance
+const SIZERS={
+  same:{label:'Same size',v:()=>0.5,note:'All the same size. Colors show the type of specialty.'},
+  pay:{label:'Pay',v:s=>(s.pay-MINPAY)/(MAXPAY-MINPAY),note:'Bigger = higher average pay (Doximity 2026).'},
+  life:{label:'Lifestyle balance',v:LIFEV,note:'Bigger = better hours, call and vacation (Marit Health 2026). Faded = no data yet.'},
+  burn:{label:'Lower burnout',v:BURNV,note:'Bigger = lower burnout (AMA 2026). Faded = no specialty-level data.'},
+  sued:{label:'Lower lawsuit risk',v:SUEDV,note:'Bigger = fewer doctors ever sued (AMA 2023; NEJM 2011 for neurosurgery and thoracic). Faded = no data.'},
+  train:{label:'Shorter training',v:s=>(7-s.train)/4,note:'Bigger = fewer years of residency and fellowship.'}
+};
+let bubSize=store.get('bubSize','same'); if(!SIZERS[bubSize]) bubSize='same';
+let homeBuilt=false, bubEls={};
+function renderHome(){
+  if(!homeBuilt){
+    const box=$('#bub-size');
+    Object.entries(SIZERS).forEach(([k,c])=>box.append(el('button',{type:'button',class:'fchip','aria-pressed':String(k===bubSize),onclick:(e)=>{bubSize=k;store.set('bubSize',k);$$('.fchip',box).forEach(b=>b.setAttribute('aria-pressed',String(b===e.currentTarget)));layoutBubbles();}},c.label)));
+    const lg=$('#bub-legend'); Object.values(CATS).forEach(c=>lg.append(el('span',{},el('i',{style:'background:'+c.color}),c.label)));
+    const wrap=$('#bubbles');
+    S.forEach((s,i)=>{
+      const b=el('button',{type:'button',class:'bub',style:`background:${CATS[s.cat].color};--dur:${(5+((i*37)%50)/10).toFixed(1)}s;--delay:-${((i*13)%40)/10}s;--dx:${((i*7)%9)-4}px;--dy:${((i*11)%9)-4}px`,'aria-label':s.name,onclick:()=>openSheet(s.id)},el('span',{},s.short));
+      bubEls[s.id]=b; wrap.append(b);
+    });
+    homeBuilt=true;
+  }
+  layoutBubbles();
+}
+function layoutBubbles(){
+  const wrap=$('#bubbles'); if(!wrap||!homeBuilt) return;
+  const W=wrap.clientWidth||360, H=wrap.clientHeight||560;
+  const sz=SIZERS[bubSize]; $('#bub-note').textContent=sz.note;
+  const area=W*H*0.62;
+  const raw=S.map(s=>{const v=sz.v(s); return {s,v,w:v==null?0.25:0.35+v};});
+  const totalW=raw.reduce((a,r)=>a+r.w*r.w,0);
+  const k=Math.sqrt(area/(Math.PI*totalW));
+  const nodes=raw.map((r,i)=>({s:r.s,nod:r.v==null,r:clamp(r.w*k,15,W<500?58:78),x:W/2+Math.cos(i*2.39996)*Math.sqrt(i+1)*W*0.06,y:H/2+Math.sin(i*2.39996)*Math.sqrt(i+1)*H*0.06}));
+  for(let it=0;it<260;it++){
+    for(const n of nodes){ n.x+=(W/2-n.x)*0.012; n.y+=(H/2-n.y)*0.012; }
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i],b=nodes[j]; let dx=b.x-a.x,dy=b.y-a.y; let d=Math.hypot(dx,dy)||0.01; const min=a.r+b.r+3;
+      if(d<min){ const push=(min-d)/2; dx/=d; dy/=d; a.x-=dx*push; a.y-=dy*push; b.x+=dx*push; b.y+=dy*push; }
+    }
+    for(const n of nodes){ n.x=clamp(n.x,n.r+2,W-n.r-2); n.y=clamp(n.y,n.r+2,H-n.r-2); }
+  }
+  nodes.forEach(n=>{
+    const b=bubEls[n.s.id]; const d=Math.round(n.r*2);
+    b.style.width=d+'px'; b.style.height=d+'px'; b.style.left=Math.round(n.x-n.r)+'px'; b.style.top=Math.round(n.y-n.r)+'px';
+    b.style.fontSize=clamp(n.r/3.4,8.5,15)+'px';
+    b.classList.toggle('nodata',n.nod);
+    b.firstChild.style.visibility=n.r<19?'hidden':'visible';
+  });
+}
+
+/* ---------------- Self-check ---------------- */
+const SQ=[
+ {id:'people',sec:'About you',t:'Talking with patients all day gives me energy.'},
+ {id:'awk',sec:'About you',t:'Small talk with strangers often feels awkward or draining.'},
+ {id:'calm',sec:'About you',t:'I think clearly when a situation suddenly turns into an emergency.'},
+ {id:'fast',sec:'About you',t:'I want fast-paced days where I never know what is coming next.'},
+ {id:'cont',sec:'About you',t:'I want to know my patients for years, not just for one visit.'},
+ {id:'hands',sec:'About you',t:'I love working with my hands and seeing a result right away.'},
+ {id:'puzzle',sec:'About you',t:'I would rather solve a visual puzzle (an image, a slide, a rash) than have a long conversation.'},
+ {id:'heavy',sec:'Stress & your life',t:'I can carry sad outcomes and bad-news conversations without them following me home.'},
+ {id:'steady',sec:'Stress & your life',t:'I would choose a calmer, steadier job over a more exciting but stressful one.'},
+ {id:'life',sec:'Stress & your life',t:'Protecting nights, weekends and family time is non-negotiable for me.'},
+ {id:'sued',sec:'Stress & your life',t:'The idea of being sued someday would weigh on me heavily.'},
+ {id:'train',sec:'Stress & your life',t:'I am willing to train 6 or more years after med school for the right field.'},
+ {id:'research',sec:'Academia vs. practice',t:'I enjoy research: asking questions, analyzing data and writing it up.'},
+ {id:'academic',sec:'Academia vs. practice',t:'I want to teach and work at a university hospital, not only see patients.'},
+ {id:'money',sec:'Be honest',t:'A high income is one of the main reasons I want to be a doctor.'}
+];
+const LK=['Strongly disagree','Disagree','Neutral','Agree','Strongly agree'];
+const REFLECT=[
+  {id:'r1',t:'Which class, rotation or experience made time disappear? What were you doing?'},
+  {id:'r2',t:'If every specialty paid exactly the same, which would you pick and why?'},
+  {id:'r3',t:'Picture yourself at 45 on a normal Tuesday. Where are you, and who are you with?'}
+];
+let sc=Object.assign({step:0,a:{},r:{},done:false},store.get('sc',{}));
+const saveSC=()=>store.set('sc',sc);
+const z=id=>sc.a[id]==null?0:(sc.a[id]-3)/2;
+const avg=(...xs)=>xs.reduce((a,b)=>a+b,0)/xs.length;
+function userVec(){
+  return {
+    people:avg(z('people'),-z('awk')),
+    acuity:avg(z('calm'),z('fast'),-z('steady')),
+    cont:avg(z('cont'),-z('fast')*0.5),
+    hands:z('hands'),
+    heavy:z('heavy'),
+    pattern:avg(z('puzzle'),z('awk')*0.5),
+    life:z('life'),
+    sued:z('sued'),
+    burn:z('steady'),
+    train:Math.min(0,z('train')),
+    research:avg(z('research'),z('academic')),
+    pay:Math.max(0,z('money'))
+  };
+}
+const DIMS={
+  people:{w:2,v:s=>s.work.people,hi:'Lots of patient contact',lo:'Less direct patient contact',me:['Behind the scenes','People person']},
+  acuity:{w:1.5,v:s=>s.work.acuity,hi:'Fast, high-acuity days',lo:'Steadier, planned days',me:['Steady & planned','Fast & intense']},
+  cont:{w:1.5,v:s=>s.work.cont,hi:'Long-term patient relationships',lo:'Short episodes of care',me:['One-time fixes','Long-term bonds']},
+  hands:{w:2,v:s=>s.work.hands,hi:'Hands-on procedures',lo:'Thinking & talking work',me:['Thinking & talking','Hands-on']},
+  heavy:{w:1,v:s=>s.work.heavy,hi:'Emotionally heavy cases',lo:'Lighter emotional load',me:['Protect my heart','Can carry heavy cases']},
+  pattern:{w:1.5,v:s=>s.work.pattern,hi:'Visual / puzzle-solving work',lo:'Conversation-driven work',me:['Conversation','Visual puzzles']},
+  life:{w:1.5,v:LIFEV,hi:'Strong lifestyle balance',lo:'Demanding schedule',me:['Career first','Life first']},
+  sued:{w:1,v:SUEDV,hi:'Lower lawsuit risk',lo:'Higher lawsuit risk',me:['Lawsuits don’t scare me','Lawsuits worry me']},
+  burn:{w:1,v:BURNV,hi:'Lower burnout',lo:'Higher burnout',me:['Thrive on stress','Want calm']},
+  train:{w:1.5,v:s=>clamp((s.train-3)/4,0,1),hi:'Long training',lo:'Shorter training',me:['Train fast','Train as long as it takes'],flip:true},
+  research:{w:1,v:s=>s.pubs!=null?clamp((s.pubs-4)/33,0,1):null,hi:'Research-heavy culture',lo:'Less research pressure',me:['Practice','Academia & research']},
+  pay:{w:1,v:s=>(s.pay-MINPAY)/(MAXPAY-MINPAY),hi:'High pay',lo:'Lower pay',me:['Money matters less','Money matters a lot']}
+};
+function fitScore(s,u,noPay){
+  let sum=0,max=0; const parts=[];
+  for(const[k,d]of Object.entries(DIMS)){
+    if(noPay&&k==='pay') continue;
+    const v=d.v(s); if(v==null) continue;
+    let ux=u[k];
+    if(k==='train') ux=-Math.abs(u[k]);                 // unwilling to train long -> prefer short; willing -> no effect
+    if(k==='heavy'&&ux>=0) continue;                     // able to carry heavy cases doesn't mean wanting them
+    if((k==='sued'||k==='burn'||k==='life')&&ux<=0) continue; // only count when you care about it
+    const c=d.w*ux*(2*v-1);
+    sum+=c; max+=d.w*Math.abs(ux);
+    if(Math.abs(c)>0.05) parts.push({k,c,v});
+  }
+  const fit=max>0?50+50*sum/max:50;
+  parts.sort((a,b)=>b.c-a.c);
+  return {s,fit:clamp(Math.round(fit),1,99),parts};
+}
+function rankAll(noPay){ const u=userVec(); return S.map(s=>fitScore(s,u,noPay)).sort((a,b)=>b.fit-a.fit||b.s.pay-a.s.pay); }
+const partLabel=p=>{const d=DIMS[p.k]; return p.v>=0.5?d.hi:d.lo;};
+
+function renderSelfCheck(){
+  if(sc.done){ $('#quiz-flow').hidden=true; $('#quiz-results').hidden=false; renderSCResults(); return; }
+  $('#quiz-flow').hidden=false; $('#quiz-results').hidden=true; drawStep();
+}
+function drawStep(){
+  const f=$('#quiz-flow'); f.replaceChildren();
+  const total=SQ.length+1, i=sc.step;
+  f.append(el('div',{style:'display:flex;justify-content:space-between;gap:10px;align-items:center'},el('p',{class:'eyebrow'},i<SQ.length?SQ[i].sec:'Reflect'),el('span',{class:'mono small muted'},Math.min(i+1,total)+' / '+total)));
+  f.append(el('div',{class:'progress','aria-hidden':'true'},el('i',{style:'width:'+((i)/total*100).toFixed(1)+'%'})));
+  if(i<SQ.length){
+    const q=SQ[i];
+    f.append(el('p',{class:'statement',id:'stmt'},q.t));
+    const lk=el('div',{class:'likert',role:'group','aria-labelledby':'stmt'});
+    LK.forEach((l,j)=>lk.append(el('button',{type:'button',class:'lk','aria-pressed':String(sc.a[q.id]===j+1),onclick:()=>{sc.a[q.id]=j+1;sc.step=i+1;saveSC();drawStep();}},l)));
+    f.append(lk);
+    f.append(el('div',{class:'flow-nav'},
+      el('button',{type:'button',class:'btn small',disabled:i===0,onclick:()=>{sc.step=Math.max(0,i-1);saveSC();drawStep();}},'← Back'),
+      el('button',{type:'button',class:'btn small',onclick:()=>{sc.step=i+1;saveSC();drawStep();}},sc.a[q.id]==null?'Skip':'Next →')));
+    if(i===0) f.append(el('p',{class:'small muted'},'Answer with your gut. There are no right answers, and nothing leaves your browser.'));
+  } else {
+    f.append(el('p',{class:'statement',style:'min-height:0'},'Three questions for you, not for us.'));
+    f.append(el('p',{class:'muted'},'Optional. Your answers stay on this device and appear in your report so you can come back to them.'));
+    REFLECT.forEach(r=>{
+      const ta=el('textarea',{id:'ta-'+r.id,'aria-label':r.t});
+      ta.value=sc.r[r.id]||''; ta.addEventListener('input',()=>{sc.r[r.id]=ta.value;saveSC();});
+      f.append(el('label',{style:'display:grid;gap:6px;font-weight:700'},r.t,ta));
+    });
+    f.append(el('div',{class:'flow-nav'},
+      el('button',{type:'button',class:'btn small',onclick:()=>{sc.step=SQ.length-1;saveSC();drawStep();}},'← Back'),
+      el('button',{type:'button',class:'btn primary',onclick:()=>{sc.done=true;saveSC();renderSelfCheck();window.scrollTo(0,0);}},'See my matches →')));
+  }
+  const first=$('.lk[aria-pressed="true"]',f)||$('.lk',f); if(first&&document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('lk')) first.focus();
+}
+function matchCard(r,i,extra){
+  const s=r.s;
+  const pros=r.parts.filter(p=>p.c>0).slice(0,3), cons=r.parts.filter(p=>p.c<0).slice(-2).reverse();
+  return el('div',{class:'result'},
+    el('span',{class:'rank'},String(i+1)),
+    el('div',{},
+      el('div',{style:'display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between'},el('h3',{},s.name),chip(s)),
+      el('div',{class:'fit'},el('span',{class:'mono small'},r.fit+'% fit'),el('div',{class:'meter','aria-hidden':'true'},el('i',{style:'width:'+r.fit+'%'}))),
+      el('div',{class:'reasons'},...pros.map(p=>el('span',{class:'tag'},'✓ '+partLabel(p))),...cons.map(p=>el('span',{class:'tag warn'},'! '+partLabel(p)))),
+      extra||null,
+      el('div',{class:'cta-row'},
+        el('button',{type:'button',class:'btn small primary',onclick:()=>openSheet(s.id)},'See the data'),
+        el('button',{type:'button',class:'btn small',onclick:()=>{setCompare(s.id);go('compare');}},'Compare'))));
+}
+function renderSCResults(){
+  const box=$('#quiz-results'); box.replaceChildren();
+  const answered=Object.keys(sc.a).length;
+  const ranked=rankAll(false), equal=rankAll(true);
+  const u=userVec();
+  // header
+  box.append(el('div',{class:'section-head'},el('p',{class:'eyebrow'},'Your results · '+answered+' of '+SQ.length+' answered'),el('h2',{},'Specialties that fit who you are'),el('p',{},'Matched on your answers about people, pressure, emotional load, lifestyle, lawsuits, research and training. Each match lists the reasons, including the ones that cut against it.')));
+  // portrait
+  const pk=['people','acuity','cont','hands','pattern','heavy','life','sued','research','train','pay'];
+  const portrait=el('div',{class:'portrait'});
+  pk.forEach(k=>{ const d=DIMS[k]; let val=u[k]; if(k==='train') val=sc.a.train==null?0:z('train'); const pos=((val+1)/2*100); portrait.append(el('div',{class:'prow'},el('div',{class:'ends'},el('span',{},d.me[0]),el('span',{},d.me[1])),el('div',{class:'ptrack',role:'img','aria-label':d.me[0]+' to '+d.me[1]+': '+Math.round(pos)+'%'},el('i',{style:'left:'+pos.toFixed(1)+'%'})))); });
+  const layout=el('div',{class:'quiz-layout'});
+  const left=el('div',{class:'card pad',style:'display:grid;gap:14px'},el('h3',{},'Your self-portrait'),el('p',{class:'small muted'},'Where you landed on each trade-off. The dot in the middle means neutral or skipped.'),portrait);
+  const right=el('div',{class:'card pad',style:'display:grid;gap:12px'},el('h3',{},'Your top 5'),...ranked.slice(0,5).map((r,i)=>matchCard(r,i)));
+  layout.append(left,right); box.append(layout);
+  // money check
+  const topIds=ranked.slice(0,5).map(r=>r.s.id), eqIds=equal.slice(0,5).map(r=>r.s.id);
+  const dropped=topIds.filter(id=>!eqIds.includes(id)), added=eqIds.filter(id=>!topIds.includes(id));
+  const money=z('money');
+  const mb=el('div',{class:'moneybox',style:'display:grid;gap:10px'},el('p',{class:'eyebrow',style:'color:var(--warn)'},'The money check'),
+    el('h3',{},dropped.length?'If every specialty paid the same, your list changes.':'Your top 5 holds up even if every specialty paid the same.'),
+    el('p',{class:'small'},dropped.length?('Out: '+dropped.map(id=>byId[id].name).join(', ')+'. In: '+added.map(id=>byId[id].name).join(', ')+'. The ones that survive are the ones that fit you, not your bank account.'):'That is a good sign: your matches come from who you are, not from pay.'),
+    money>0.4?el('p',{class:'small muted'},'You said income is a main reason for you. That is honest and fine. Just know every specialty here pays far above the U.S. average, and burnout tends to follow a poor fit more than a lower salary.'):null,
+    el('div',{class:'reasons'},...equal.slice(0,5).map((r,i)=>el('button',{type:'button',class:'tag',style:'cursor:pointer',onclick:()=>openSheet(r.s.id)},(i+1)+'. '+r.s.name+' · '+r.fit+'%'))));
+  box.append(mb);
+  // surprise picks
+  const surprise=ranked.slice(5,10).filter(r=>r.s.pay<300000||r.s.cat==='peds'||r.s.cat==='primary').slice(0,3);
+  const sp=surprise.length?surprise:ranked.slice(5,8);
+  box.append(el('div',{class:'card pad',style:'display:grid;gap:12px'},el('p',{class:'eyebrow'},'Worth a second look'),el('h3',{},'Specialties you might not have considered'),el('p',{class:'small muted'},'High fit with you, but rarely hyped online.'),...sp.map((r,i)=>matchCard(r,i+5))));
+  // reflections + actions
+  const refl=REFLECT.filter(r=>sc.r[r.id]&&sc.r[r.id].trim());
+  const card=el('div',{class:'card pad',style:'display:grid;gap:10px'},el('h3',{},'Your reflections'));
+  if(refl.length) refl.forEach(r=>card.append(el('div',{class:'readpanel'},el('p',{class:'small muted',style:'font-weight:700'},r.t),el('p',{},sc.r[r.id]))));
+  else card.append(el('p',{class:'small muted'},'You skipped the reflection questions. They are often the most useful part, so go back when you have two quiet minutes.'));
+  const status=el('p',{class:'small muted',role:'status'});
+  card.append(el('div',{class:'cta-row'},
+    el('button',{type:'button',class:'btn small primary',onclick:async()=>{const txt=reportText(ranked,equal);try{await navigator.clipboard.writeText(txt);status.textContent='Copied. Paste it into your notes or send it to your advisor.';}catch(e){status.textContent='Copy is blocked here. Select the text in the box below instead.';card.append(el('textarea',{readonly:true},txt));}}},'Copy my report'),
+    el('button',{type:'button',class:'btn small',onclick:()=>{sc.done=false;sc.step=SQ.length;saveSC();renderSelfCheck();}},'Edit reflections'),
+    el('button',{type:'button',class:'btn small',onclick:()=>{sc={step:0,a:{},r:{},done:false};saveSC();renderSelfCheck();window.scrollTo(0,0);}},'Start over')),status);
+  box.append(card);
+  box.append(el('p',{class:'disclaimer'},'This is a reflection tool, not a test. Work-style ratings are our description of each field’s daily work. Burnout, lawsuit, hours, research and pay figures come from the published sources on the Sources tab. Talk with residents and attendings, and shadow, before you decide.'));
+}
+function reportText(ranked,equal){
+  const L=[]; L.push('My SpecialtyScope self-check');
+  L.push('Top matches: '+ranked.slice(0,5).map(r=>r.s.name+' ('+r.fit+'%)').join(', '));
+  L.push('If pay were equal: '+equal.slice(0,5).map(r=>r.s.name).join(', '));
+  REFLECT.forEach(r=>{ if(sc.r[r.id]) L.push(r.t+'\n  '+sc.r[r.id]); });
+  return L.join('\n');
+}
+
+/* ---------------- Explore ---------------- */
+const ex={q:'',cat:'all',sort:'pay'};
+let exBuilt=false;
+function renderExplore(){
+  if(!exBuilt){
+    const cats=$('#ex-cats');
+    const mk=(key,label,color)=>el('button',{type:'button',class:'fchip','aria-pressed':String(ex.cat===key),style:color?'color:'+color:null,onclick:(e)=>{ex.cat=key;$$('.fchip',cats).forEach(b=>b.setAttribute('aria-pressed',String(b===e.currentTarget)));drawExplore();}},label);
+    cats.append(mk('all','All specialties'));
+    Object.entries(CATS).forEach(([k,c])=>cats.append(mk(k,c.label,c.color)));
+    $('#ex-search').addEventListener('input',e=>{ex.q=e.target.value.trim().toLowerCase();drawExplore();});
+    $('#ex-sort').addEventListener('change',e=>{ex.sort=e.target.value;drawExplore();});
+    exBuilt=true;
+  }
+  drawExplore();
+}
+function drawExplore(){
+  let list=S.filter(s=>(ex.cat==='all'||s.cat===ex.cat)&&(!ex.q||(s.name+' '+CATS[s.cat].label).toLowerCase().includes(ex.q)));
+  const by={pay:(a,b)=>b.pay-a.pay,hours:(a,b)=>(a.life?a.life.hours:999)-(b.life?b.life.hours:999),train:(a,b)=>a.train-b.train||b.pay-a.pay,match:(a,b)=>(a.nrmp?a.nrmp.md:999)-(b.nrmp?b.nrmp.md:999),name:(a,b)=>a.name.localeCompare(b.name)}[ex.sort];
+  list.sort(by);
+  $('#ex-count').textContent=list.length+(list.length===1?' specialty':' specialties')+(ex.sort==='hours'?' · specialties without hours data are listed last':'')+(ex.sort==='match'?' · ranked by 2026 U.S. MD senior match rate; no NRMP data listed last':'');
+  const g=$('#ex-grid'); g.replaceChildren();
+  if(!list.length){g.append(el('p',{class:'muted'},'No specialty matches that search. Try a shorter word, like "card" or "peds".'));return;}
+  list.forEach(s=>{
+    const stats=el('div',{class:'stats'},
+      el('span',{},'Training ',el('b',{},s.train+' yrs')),
+      s.life?el('span',{},'Hours ',el('b',{},s.life.hours+'/wk')):el('span',{},'Hours ',el('b',{},'n/a')),
+      s.life?el('span',{},'PTO ',el('b',{},s.life.pto+' wks')):null,
+      s.nrmp?el('span',{},'MD match ',el('b',{},s.nrmp.md+'%')):null,
+      s.burnout!=null?el('span',{},'Burnout ',el('b',{},s.burnout+'%')):null,
+      s.sued!=null?el('span',{},'Ever sued ',el('b',{},s.sued+'%')):null);
+    g.append(el('button',{type:'button',class:'card scard',style:'--cat:'+CATS[s.cat].color,onclick:()=>openSheet(s.id),'aria-label':s.name+', average pay '+money(s.pay)},
+      el('div',{style:'display:flex;justify-content:space-between;gap:8px;align-items:flex-start'},el('h3',{},s.name)),
+      chip(s),
+      el('div',{class:'pay'},money(s.pay)),
+      el('div',{class:'bar','aria-hidden':'true'},el('i',{style:'width:'+(s.pay/MAXPAY*100).toFixed(1)+'%'})),
+      stats));
+  });
+}
+
+/* ---------------- Detail sheet ---------------- */
+let lastFocus=null;
+function openSheet(id){
+  const s=byId[id]; if(!s) return;
+  lastFocus=document.activeElement;
+  const b=$('#sheet-body'); b.replaceChildren();
+  b.append(el('div',{style:'display:grid;gap:8px;padding-right:44px'},chip(s),el('h2',{id:'sheet-title'},s.name)));
+  const kv=el('div',{class:'kv',style:'margin-top:14px'},
+    el('div',{},el('p',{class:'k'},'Average pay'),el('p',{class:'v'},money(s.pay)),el('p',{class:'s'},'Doximity 2026 report')),
+    s.medscape?el('div',{},el('p',{class:'k'},'Medscape average'),el('p',{class:'v'},money(s.medscape)),el('p',{class:'s'},'Medscape 2026 report'+(s.id==='oncology'||s.id==='hematology'?' (oncology & hematology combined)':''))):null,
+    el('div',{},el('p',{class:'k'},'Training after med school'),el('p',{class:'v'},s.train+' years'),el('p',{class:'s'},'Typical minimum, ACGME programs')),
+    s.life?el('div',{},el('p',{class:'k'},'Rough pay per hour'),el('p',{class:'v'},money(hourly(s))),el('p',{class:'s'},'Pay ÷ (hours × working weeks)')):null);
+  b.append(kv);
+  const ch=el('div',{class:'block'},el('h3',{},'What the work is like'),el('div',{class:'reasons'},el('span',{class:'tag'},PROC[s.proc]),el('span',{class:'tag'},POP[s.pop]),el('span',{class:'tag'},PACE[s.pace]),el('span',{class:'tag'},SETTING[s.setting])),el('p',{class:'small muted'},'General characteristics. Individual jobs vary a lot within every specialty.'));
+  b.append(ch);
+  const W=s.work;
+  const wb=(label,v)=>el('div',{class:'wbar'},el('span',{},label),el('span',{class:'t',role:'img','aria-label':label+': '+Math.round(v*100)+' of 100'},el('i',{style:'width:'+Math.round(v*100)+'%'})));
+  b.append(el('div',{class:'block'},el('h3',{},'What the work asks of you'),
+    el('div',{class:'wbars'},wb('Patient contact',W.people),wb('Emergencies & pace',W.acuity),wb('Long-term patients',W.cont),wb('Hands-on procedures',W.hands),wb('Emotional weight',W.heavy),wb('Visual puzzle work',W.pattern)),
+    el('p',{class:'src'},'Our characterization of typical daily work, used by the self-check. Not survey data.')));
+  const risk=el('div',{class:'kv'},
+    el('div',{},el('p',{class:'k'},'Burnout'),el('p',{class:'v'},s.burnout!=null?s.burnout+'%':'n/a'),el('p',{class:'s'},s.burnout!=null?'AMA 2026 Organizational Biopsy':'No specialty-level AMA figure')),
+    el('div',{},el('p',{class:'k'},'Ever sued'),el('p',{class:'v'},s.sued!=null?s.sued+'%':(s.suedYr!=null?s.suedYr+'%/yr':'n/a')),el('p',{class:'s'},s.sued!=null?'Share of doctors sued so far in their careers (AMA, 2020–22 data)':(s.suedYr!=null?'Faced a malpractice claim each year (NEJM 2011), among the highest of any specialty':'No specialty-level figure'))),
+    el('div',{},el('p',{class:'k'},'Research by match'),el('p',{class:'v'},s.pubs!=null?String(s.pubs):'n/a'),el('p',{class:'s'},s.pubs!=null?'Avg abstracts, posters & papers of matched MD seniors (NRMP 2024; all-specialty avg 10.0)':'Not reported for this path')));
+  b.append(el('div',{class:'block'},el('h3',{},'Stress, lawsuits & research'),risk));
+  if(s.life){
+    const L=s.life;
+    b.append(el('div',{class:'block'},el('h3',{},'Lifestyle'),
+      el('div',{class:'kv'},
+        el('div',{},el('p',{class:'k'},'Hours per week'),el('p',{class:'v'},String(L.hours)),el('p',{class:'s'},'All-specialty average: 45.6')),
+        el('div',{},el('p',{class:'k'},'Vacation (PTO)'),el('p',{class:'v'},L.pto+' wks'),el('p',{class:'s'},'All-specialty average: 5.0')),
+        el('div',{},el('p',{class:'k'},'Call burden'),el('p',{class:'v'},L.call.toFixed(2)),el('p',{class:'s'},'1.00 = average; higher = more call')),
+        el('div',{},el('p',{class:'k'},'Schedule quality'),el('p',{class:'v'},L.sched.toFixed(2)),el('p',{class:'s'},'Weekday, daytime, shorter shifts; higher = better')),
+        el('div',{},el('p',{class:'k'},'Lifestyle Balance Index'),el('p',{class:'v'},L.lbi.toFixed(2)),el('p',{class:'s'},'1.00 = average; higher = better balance'))),
+      el('p',{class:'src'},'Marit Health 2026 Lifestyle Balance Index'+(L.src!==s.name&&!(s.name.startsWith(L.src))?' · listed there as "'+L.src+'"':''))));
+  } else {
+    b.append(el('div',{class:'block'},el('h3',{},'Lifestyle'),el('p',{class:'note'},'Marit Health does not report hours or vacation for this specialty yet (it needs at least 30 physician submissions).')));
+  }
+  if(s.nrmp){
+    const N=s.nrmp;
+    b.append(el('div',{class:'block'},el('h3',{},'Getting in (2026 Match)'),
+      el('div',{class:'kv'},
+        el('div',{},el('p',{class:'k'},'MD seniors who matched'),el('p',{class:'v'},N.md+'%'),el('p',{class:'s'},'When it was their first choice')),
+        N.do!=null?el('div',{},el('p',{class:'k'},'DO seniors who matched'),el('p',{class:'v'},N.do+'%'),el('p',{class:'s'},'When it was their first choice')):null,
+        el('div',{},el('p',{class:'k'},'Step 2 CK, matched MDs'),el('p',{class:'v'},String(N.s2)),el('p',{class:'s'},'Median; middle half '+N.q1+'–'+N.q3)),
+        N.um!=null?el('div',{},el('p',{class:'k'},'Step 2 CK, unmatched MDs'),el('p',{class:'v'},String(N.um)),el('p',{class:'s'},'Median')):null,
+        N.comlex!=null?el('div',{},el('p',{class:'k'},'COMLEX Level 2, matched DOs'),el('p',{class:'v'},String(N.comlex)),el('p',{class:'s'},'Median')):null),
+      el('p',{class:'src'},'NRMP Charting Outcomes 2026 ("'+N.name+'")'),
+      el('div',{class:'cta-row'},el('button',{type:'button',class:'btn small primary',onclick:()=>{closeSheet();chance.spec=s.id;go('chance');}},'Chance me for '+s.name))));
+  }
+  const pn=pathNote(s); if(pn) b.append(el('p',{class:'note',style:'margin-top:16px'},pn));
+  b.append(el('div',{class:'cta-row',style:'margin-top:18px'},el('button',{type:'button',class:'btn small',onclick:()=>{closeSheet();setCompare(s.id);go('compare');}},'Add to compare')));
+  $('#sheet').hidden=false; document.body.style.overflow='hidden';
+  $('.sheet-close').focus();
+}
+function closeSheet(){ $('#sheet').hidden=true; document.body.style.overflow=''; if(lastFocus&&lastFocus.focus) try{lastFocus.focus();}catch(e){} }
+$$('[data-close]').forEach(n=>n.addEventListener('click',closeSheet));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();});
+
+/* ---------------- Lifestyle ---------------- */
+const LIFE=S.filter(s=>s.life);
+let selLife=store.get('selLife','derm'); if(!byId[selLife]||!byId[selLife].life) selLife='derm';
+let lifeBuilt=false;
+function renderLifestyle(){
+  if(!lifeBuilt){
+    const lg=$('#scatter-legend');
+    const used=[...new Set(LIFE.map(s=>s.cat))];
+    used.forEach(c=>lg.append(el('span',{},el('i',{style:'background:'+CATS[c].color}),CATS[c].label)));
+    $('#rank-by').addEventListener('change',drawRank);
+    lifeBuilt=true;
+  }
+  drawScatter(); drawRead(); drawRank(); drawStress();
+}
+function drawScatter(){
+  const box=$('#scatter'); box.replaceChildren();
+  const W=Math.max(300,box.clientWidth||600), H=W<520?320:380;
+  const svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Scatter chart of average pay versus weekly hours for 31 specialties'});
+  box.append(svg);
+  const xMin=34,xMax=58,yMin=200000,yMax=850000;
+  const yt=[200000,300000,400000,500000,600000,700000,800000];
+  const probe=sv('text',{class:'lbl'},'$800K'); svg.append(probe); const ml=probe.getComputedTextLength()+14||52; probe.remove();
+  const mr=12,mt=10,mb=40;
+  const x=v=>ml+(v-xMin)/(xMax-xMin)*(W-ml-mr), y=v=>mt+(1-(v-yMin)/(yMax-yMin))*(H-mt-mb);
+  yt.forEach(t=>{svg.append(sv('line',{class:'gridline',x1:ml,x2:W-mr,y1:y(t),y2:y(t)}));svg.append(sv('text',{class:'lbl',x:ml-8,y:y(t)+4,'text-anchor':'end'},'$'+t/1000+'K'));});
+  const step=W<520?6:4;
+  for(let t=36;t<=58;t+=step){svg.append(sv('text',{class:'lbl',x:x(t),y:H-mb+18,'text-anchor':'middle'},t));}
+  svg.append(sv('text',{class:'lbl',x:(ml+W-mr)/2,y:H-6,'text-anchor':'middle'},'Hours worked per week (Marit Health 2026)'));
+  const avg=45.6; svg.append(sv('line',{x1:x(avg),x2:x(avg),y1:mt,y2:H-mb,stroke:'var(--muted)','stroke-dasharray':'4 4',opacity:.6}));
+  svg.append(sv('text',{class:'lbl',x:x(avg)+4,y:mt+12},'avg 45.6 h'));
+  const r=W<520?6:7.5;
+  LIFE.slice().sort((a,b)=>(a.id===selLife)-(b.id===selLife)).forEach(s=>{
+    const cx=x(s.life.hours), cy=y(s.pay), on=s.id===selLife;
+    const g=sv('g',{tabindex:'0',role:'button','aria-label':s.name+': '+s.life.hours+' hours per week, average pay '+money(s.pay),style:'cursor:pointer'});
+    g.append(sv('circle',{cx,cy,r:r+8,fill:'transparent'}));
+    g.append(sv('circle',{cx,cy,r:on?r+3:r,fill:CATS[s.cat].color,stroke:on?'var(--ink)':'var(--card)', 'stroke-width':on?3:1.5,opacity:on?1:.88}));
+    const pick=()=>{selLife=s.id;store.set('selLife',selLife);drawScatter();drawRead();};
+    g.addEventListener('click',pick); g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}});
+    svg.append(g);
+    if(on){ const right=cx<W*0.6; svg.append(sv('text',{x:right?cx+r+8:cx-r-8,y:cy+4,'text-anchor':right?'start':'end','font-family':'var(--font-display)','font-weight':'700','font-size':'13',fill:'var(--ink)'},s.name)); }
+  });
+}
+function drawRead(){
+  const s=byId[selLife], L=s.life, p=$('#scatter-read'); p.replaceChildren();
+  p.append(el('div',{style:'display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between'},el('h3',{},s.name),chip(s)));
+  p.append(el('div',{class:'stats'},el('span',{},'Pay ',el('b',{},money(s.pay))),el('span',{},'Hours ',el('b',{},L.hours+'/wk')),el('span',{},'PTO ',el('b',{},L.pto+' wks')),el('span',{},'Call ',el('b',{},L.call.toFixed(2))),el('span',{},'≈ ',el('b',{},money(hourly(s))),' per hour')));
+  p.append(el('div',{},el('button',{type:'button',class:'btn small',onclick:()=>openSheet(s.id)},'Full stats')));
+}
+function drawRank(){
+  const by=$('#rank-by').value;
+  const conf={
+    lbi:{t:'Lifestyle Balance Index',help:'Marit Health combines hours, schedule quality, call, clinical time and vacation. 1.00 is the all-specialty average; higher means better balance.',v:s=>s.life.lbi,f:v=>v.toFixed(2),desc:true},
+    hours:{t:'Fewest hours per week',help:'Average hours worked per week, full-time physicians. All-specialty average: 45.6. Emergency medicine works shifts, so it has fewer hours but more nights and weekends.',v:s=>s.life.hours,f:v=>v.toFixed(1)+' h',desc:false},
+    pto:{t:'Most vacation',help:'Average weeks of paid time off per year. All-specialty average: 5.0 weeks.',v:s=>s.life.pto,f:v=>v.toFixed(1)+' wk',desc:true},
+    call:{t:'Lightest call',help:'Marit Health call-burden score. 1.00 is average; lower means less call.',v:s=>s.life.call,f:v=>v.toFixed(2),desc:false},
+    hourly:{t:'Estimated pay per hour',help:'Our rough estimate: Doximity average pay ÷ (Marit hours per week × (52 − PTO weeks)). Two different surveys, so treat it as ballpark.',v:s=>hourly(s),f:v=>'$'+Math.round(v),desc:true}
+  }[by];
+  $('#rank-title').textContent=conf.t; $('#rank-help').textContent=conf.help;
+  const list=LIFE.slice().sort((a,b)=>conf.desc?conf.v(b)-conf.v(a):conf.v(a)-conf.v(b));
+  const vals=list.map(conf.v), mx=Math.max(...vals), mn=Math.min(...vals);
+  const box=$('#rank-list'); box.replaceChildren();
+  list.forEach(s=>{
+    const v=conf.v(s); const pct=conf.desc?(v/mx*100):((mx-v)/(mx-mn)*85+15);
+    box.append(el('button',{type:'button',class:'rrow',onclick:()=>openSheet(s.id)},el('span',{},s.name),el('span',{class:'rb','aria-hidden':'true'},el('i',{style:'width:'+pct.toFixed(1)+'%;background:'+CATS[s.cat].color})),el('span',{class:'rv'},conf.f(v))));
+  });
+}
+
+
+function drawStress(){
+  const box=$('#stress-lists'); if(!box) return; box.replaceChildren();
+  const mk=(title,help,list,val,fmt,maxv,color)=>{
+    const c=el('div',{style:'display:grid;gap:8px'},el('h3',{},title),el('p',{class:'small muted'},help));
+    const rl=el('div',{class:'rank-list'});
+    list.forEach(s=>rl.append(el('button',{type:'button',class:'rrow',onclick:()=>openSheet(s.id)},el('span',{},s.name),el('span',{class:'rb','aria-hidden':'true'},el('i',{style:'width:'+(val(s)/maxv*100).toFixed(1)+'%;background:'+color})),el('span',{class:'rv'},fmt(val(s))))));
+    c.append(rl); return c;
+  };
+  const B=S.filter(s=>s.burnout!=null).sort((a,b)=>a.burnout-b.burnout);
+  const L=S.filter(s=>s.sued!=null).sort((a,b)=>a.sued-b.sued);
+  box.append(mk('Burnout, lowest first','Share of physicians with burnout symptoms, AMA 2026 Organizational Biopsy (15 specialties reported).',B,s=>s.burnout,v=>v.toFixed(1)+'%',55,'var(--trace)'));
+  box.append(mk('Ever sued, lowest first','Share of physicians sued at some point so far in their careers, AMA survey 2020–2022. Neurosurgery (19.1%) and thoracic surgery (18.9%) top a 2011 NEJM study of claims per year.',L,s=>s.sued,v=>v.toFixed(1)+'%',65,'var(--warn)'));
+}
+
+/* ---------------- Compare ---------------- */
+let cmp=store.get('cmp',['derm','vascular','fm']).filter(id=>id===''||byId[id]);
+while(cmp.length<3) cmp.push('');
+function setCompare(id){ if(cmp.includes(id)) return; const i=cmp.indexOf(''); if(i>=0) cmp[i]=id; else cmp=[cmp[1],cmp[2],id]; store.set('cmp',cmp); }
+let cmpBuilt=false;
+const SERIES=['var(--trace)','var(--ceil)','var(--c-primary)'];
+function renderCompare(){
+  ['a','b','c'].forEach((k,i)=>{
+    const sel=$('#cmp-'+k); sel.replaceChildren(el('option',{value:''},'None'));
+    S.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>sel.append(el('option',{value:s.id},s.name)));
+    sel.value=cmp[i]||'';
+    if(!cmpBuilt) sel.addEventListener('change',()=>{cmp[i]=sel.value;store.set('cmp',cmp);drawCompare();});
+  });
+  if(!cmpBuilt) $('#cmp-year').addEventListener('input',drawCompare);
+  cmpBuilt=true; drawCompare();
+}
+function picked(){ return cmp.map((id,i)=>id?{s:byId[id],color:SERIES[i]}:null).filter(Boolean); }
+function earnings(s){ const out=[]; let tot=0; for(let y=1;y<=20;y++){ let p=0; if(y>4){ const t=y-4; p=t<=s.train?PGY[Math.min(t,PGY.length)-1]:s.pay; } tot+=p; out.push(tot);} return out; }
+function drawCompare(){
+  const P=picked(); const yr=parseInt($('#cmp-year').value,10)||2026;
+  const tw=$('#cmp-table'); tw.replaceChildren();
+  if(!P.length){tw.append(el('p',{class:'muted'},'Pick at least one specialty above.')); $('#cmp-timeline').replaceChildren(); $('#cmp-chart').replaceChildren(); $('#cmp-legend').replaceChildren(); return;}
+  const rows=[
+    ['Average pay (Doximity 2026)',s=>money(s.pay)],
+    ['Training after med school',s=>s.train+' years'],
+    ['First attending year (est.)',s=>String(yr+4+s.train)],
+    ['Hours per week',s=>s.life?String(s.life.hours):'n/a'],
+    ['Vacation (PTO weeks)',s=>s.life?String(s.life.pto):'n/a'],
+    ['Call burden (1.00 = avg)',s=>s.life?s.life.call.toFixed(2):'n/a'],
+    ['Rough pay per hour',s=>s.life?money(hourly(s)):'n/a'],
+    ['MD seniors matched (2026)',s=>s.nrmp?s.nrmp.md+'%':'n/a'],
+    ['Step 2 CK, matched median',s=>s.nrmp?String(s.nrmp.s2):'n/a'],
+    ['Pay earned by year 20 (est.)',s=>kmoney(earnings(s)[19])]
+  ];
+  const t=el('table',{},el('thead',{},el('tr',{},el('th',{},''),...P.map(p=>el('th',{style:'color:'+p.color},p.s.name)))),el('tbody',{},...rows.map(([k,f])=>el('tr',{},el('th',{scope:'row'},k),...P.map(p=>el('td',{class:'num'},f(p.s)))))));
+  tw.append(t);
+  const tl=$('#cmp-timeline'); tl.replaceChildren();
+  P.forEach(p=>{
+    const s=p.s, att=Math.max(0,20-4-s.train);
+    const seg=(n,c,l)=>n>0?el('span',{style:`flex:${n};background:${c}`,title:l},n>=2?l:''):null;
+    tl.append(el('div',{class:'tl-row'},el('div',{style:'display:flex;justify-content:space-between;gap:8px;font-weight:700'},el('span',{style:'color:'+p.color},s.name),el('span',{class:'mono small muted'},yr+' → '+(yr+20))),
+      el('div',{class:'tl-bar',role:'img','aria-label':s.name+': 4 years med school, '+s.train+' years training, then attending'},seg(4,'#7652C4','Med school'),seg(s.train,'#C9760F','Residency'+(s.train>5?' + fellowship':'')),seg(att,'#13808F','Attending'))));
+  });
+  tl.append(el('div',{class:'legend'},el('span',{},el('i',{style:'background:#7652C4'}),'Med school'),el('span',{},el('i',{style:'background:#C9760F'}),'Residency / fellowship'),el('span',{},el('i',{style:'background:#13808F'}),'Attending')));
+  const lg=$('#cmp-legend'); lg.replaceChildren(...P.map(p=>el('span',{},el('i',{style:'background:'+p.color}),p.s.name)));
+  drawCmpChart();
+}
+function drawCmpChart(){
+  const P=picked(); const box=$('#cmp-chart'); box.replaceChildren(); if(!P.length) return;
+  const yr=parseInt($('#cmp-year').value,10)||2026;
+  const W=Math.max(300,box.clientWidth||600), H=W<520?280:330;
+  const svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Line chart of cumulative estimated pay over 20 years'}); box.append(svg);
+  const series=P.map(p=>({p,v:earnings(p.s)}));
+  const top=Math.max(...series.map(x=>x.v[19]));
+  const stepY=top>8e6?2e6:top>4e6?1e6:5e5; const yMax=Math.ceil(top/stepY)*stepY;
+  const probe=sv('text',{class:'lbl'},'$10.00M'); svg.append(probe); const ml=(probe.getComputedTextLength()||50)+12; probe.remove();
+  const ends=series.map(x=>kmoney(x.v[19])); const probe2=sv('text',{class:'lbl','font-weight':'600'},ends.reduce((a,b)=>a.length>b.length?a:b)); svg.append(probe2); const mr=(probe2.getComputedTextLength()||50)+14; probe2.remove();
+  const mt=10,mb=34;
+  const x=i=>ml+(i)/(19)*(W-ml-mr), y=v=>mt+(1-v/yMax)*(H-mt-mb);
+  for(let v=0;v<=yMax;v+=stepY){svg.append(sv('line',{class:'gridline',x1:ml,x2:W-mr,y1:y(v),y2:y(v)}));svg.append(sv('text',{class:'lbl',x:ml-8,y:y(v)+4,'text-anchor':'end'},v===0?'$0':kmoney(v)));}
+  const ticks=W<520?[0,4,9,14,19]:[0,2,4,6,8,10,12,14,16,18,19];
+  ticks.forEach(i=>svg.append(sv('text',{class:'lbl',x:x(i),y:H-mb+18,'text-anchor':'middle'},String(yr+i))));
+  svg.append(sv('rect',{x:x(0),y:mt,width:x(3)-x(0)+(x(1)-x(0))/2,height:H-mt-mb,fill:'var(--c-med)',opacity:.07}));
+  svg.append(sv('text',{class:'lbl',x:x(0)+4,y:mt+12},'Med school'));
+  const labels=[];
+  series.forEach(({p,v})=>{
+    const d=v.map((val,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(val).toFixed(1)).join(' ');
+    svg.append(sv('path',{d,fill:'none',stroke:p.color,'stroke-width':3,'stroke-linejoin':'round'}));
+    v.forEach((val,i)=>{ if(i===19) svg.append(sv('circle',{cx:x(i),cy:y(val),r:4.5,fill:p.color})); });
+    labels.push({y:y(v[19]),t:kmoney(v[19]),c:p.color});
+  });
+  labels.sort((a,b)=>a.y-b.y); for(let i=1;i<labels.length;i++){ if(labels[i].y-labels[i-1].y<14) labels[i].y=labels[i-1].y+14; }
+  labels.forEach(l=>svg.append(sv('text',{x:W-mr+8,y:l.y+4,fill:l.c,'font-family':'var(--font-mono)','font-weight':'600','font-size':'12'},l.t)));
+}
+
+/* ---------------- Chance me ---------------- */
+const NR=S.filter(s=>s.nrmp).sort((a,b)=>a.name.localeCompare(b.name));
+const chance={mode:'res',spec:store.get('chSpec','derm')};
+let chBuilt=false;
+function renderChance(){
+  if(!chBuilt){
+    const sel=$('#ch-spec'); NR.forEach(s=>sel.append(el('option',{value:s.id},s.name)));
+    ['#ch-spec','#ch-type','#ch-res','#ch-lor','#ch-aoa','#ch-away','#ch-broad'].forEach(id=>$(id).addEventListener('change',renderChanceOut));
+    $('#ch-step').addEventListener('input',renderChanceOut);
+    $('#mode-res').addEventListener('click',()=>setMode('res')); $('#mode-med').addEventListener('click',()=>setMode('med'));
+    buildMed(); chBuilt=true;
+  }
+  if(byId[chance.spec]&&byId[chance.spec].nrmp) $('#ch-spec').value=chance.spec;
+  setMode(chance.mode);
+}
+function setMode(m){ chance.mode=m; $('#mode-res').setAttribute('aria-pressed',String(m==='res')); $('#mode-med').setAttribute('aria-pressed',String(m==='med')); $('#panel-res').hidden=m!=='res'; $('#panel-med').hidden=m!=='med'; if(m==='res') renderChanceOut(); else renderMed(); }
+const npdf=(x,m,sd)=>Math.exp(-0.5*((x-m)/sd)**2)/(sd*Math.sqrt(2*Math.PI));
+function setRing(fg,txt,p){ const c=339.3; $(fg).setAttribute('stroke-dashoffset',String(c*(1-p/100))); $(txt).textContent=Math.round(p)+'%'; }
+function renderChanceOut(){
+  const s=byId[$('#ch-spec').value]; chance.spec=s.id; store.set('chSpec',s.id);
+  const N=s.nrmp, type=$('#ch-type').value, step=+$('#ch-step').value;
+  $('#ch-step-val').textContent=step;
+  $('#ch-step-wrap').hidden=(type==='do');
+  const steps=$('#ch-steps'); steps.replaceChildren();
+  const base=type==='md'?N.md:N.do;
+  if(base==null){ $('#ch-headline').textContent='Not enough data'; $('#ch-sub').textContent='NRMP reports too few DO seniors in this specialty to give a rate.'; $('#ring-txt').textContent='—'; $('#ring-fg').setAttribute('stroke-dashoffset','339.3'); $('#ch-dist').replaceChildren(); $('#ch-dist-legend').replaceChildren(); return; }
+  steps.append(el('div',{class:'steprow'},el('span',{},(type==='md'?'U.S. MD':'U.S. DO')+' seniors who matched when '+s.name+' was their first choice (NRMP 2026)'),el('b',{},base+'%')));
+  let p=base/100, scoreUsed=false;
+  const sd=(N.q3-N.q1)/1.349;
+  if(type==='md'&&N.um!=null){
+    const fm=npdf(step,N.s2,sd), fu=npdf(step,N.um,sd);
+    p=(p*fm)/(p*fm+(1-p)*fu); scoreUsed=true;
+    steps.append(el('div',{class:'steprow'},el('span',{},'Adjusted for your Step 2 CK of '+step+' (matched median '+N.s2+', unmatched median '+N.um+')'),el('b',{},(p*100).toFixed(0)+'%')));
+  } else if(type==='md'){
+    steps.append(el('div',{class:'steprow'},el('span',{},'NRMP lists too few unmatched applicants to adjust for Step 2 here. Matched median: '+N.s2+' (middle half '+N.q1+'–'+N.q3+')'),el('b',{},'—')));
+  } else {
+    steps.append(el('div',{class:'steprow'},el('span',{},'Score adjustment is for MD seniors only. Matched DOs\' median COMLEX Level 2: '+(N.comlex!=null?N.comlex:'not reported')),el('b',{},'—')));
+  }
+  const mult={low:.75,mid:1,high:1.25}[$('#ch-res').value]*{weak:.7,solid:1,strong:1.15,top:1.35}[$('#ch-lor').value]*($('#ch-aoa').checked?1.3:1)*($('#ch-away').checked?1.15:1)*($('#ch-broad').checked?1:.8);
+  const pc=clamp(p,0.005,0.995); let odds=pc/(1-pc)*mult; let pf=odds/(1+odds); pf=clamp(pf,0.01,0.99);
+  steps.append(el('div',{class:'steprow'},el('span',{},'With your research, letters and other choices (rough assumption)'),el('b',{},(pf*100).toFixed(0)+'%')));
+  const pct=pf*100;
+  setRing('#ring-fg','#ring-txt',pct);
+  const label=pct>=85?'Strong position':pct>=65?'Competitive':pct>=45?'Possible: have a backup':'Reach: plan a parallel application';
+  $('#ch-headline').textContent=label;
+  $('#ch-sub').textContent=s.name+' · '+(type==='md'?'MD':'DO')+' senior'+(scoreUsed?' · Step 2 '+step:'');
+  drawDist(N,step,type==='md'&&N.um!=null,base/100);
+}
+function drawDist(N,step,both,p){
+  const box=$('#ch-dist'); box.replaceChildren(); const lg=$('#ch-dist-legend'); lg.replaceChildren();
+  const W=Math.max(280,box.clientWidth||500), H=170, ml=10, mr=10, mt=14, mb=28;
+  const xMin=210,xMax=285, sd=(N.q3-N.q1)/1.349;
+  const svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Estimated Step 2 CK score curves for matched and unmatched applicants, with your score marked'}); box.append(svg);
+  const x=v=>ml+(v-xMin)/(xMax-xMin)*(W-ml-mr);
+  const pts=[]; for(let v=xMin;v<=xMax;v+=0.5) pts.push(v);
+  const fm=v=>p*npdf(v,N.s2,sd), fu=v=>(1-p)*npdf(v,N.um,sd);
+  const peak=Math.max(...pts.map(v=>Math.max(fm(v),both?fu(v):0)));
+  const y=d=>mt+(1-d/peak)*(H-mt-mb);
+  const area=f=>'M'+x(xMin)+' '+y(0)+' '+pts.map(v=>'L'+x(v).toFixed(1)+' '+y(f(v)).toFixed(1)).join(' ')+' L'+x(xMax)+' '+y(0)+' Z';
+  svg.append(sv('path',{d:area(fm),fill:'var(--ceil)',opacity:.22,stroke:'var(--ceil)','stroke-width':2}));
+  if(both) svg.append(sv('path',{d:area(fu),fill:'var(--trace)',opacity:.14,stroke:'var(--trace)','stroke-width':2,'stroke-dasharray':'5 4'}));
+  for(let t=215;t<=285;t+=(W<420?20:10)) svg.append(sv('text',{class:'lbl',x:x(t),y:H-8,'text-anchor':'middle'},t));
+  svg.append(sv('line',{x1:ml,x2:W-mr,y1:y(0),y2:y(0),stroke:'var(--line)'}));
+  if(!$('#ch-step-wrap').hidden){
+    const sx=x(clamp(step,xMin,xMax));
+    svg.append(sv('line',{x1:sx,x2:sx,y1:mt-6,y2:y(0),stroke:'var(--ink)','stroke-width':2.5}));
+    svg.append(sv('text',{x:sx+(sx>W*0.7?-6:6),y:mt+4,'text-anchor':sx>W*0.7?'end':'start','font-family':'var(--font-mono)','font-size':'12','font-weight':'600',fill:'var(--ink)'},'You: '+step));
+  }
+  lg.append(el('span',{},el('i',{style:'background:var(--ceil)'}),'Matched (median '+N.s2+')'));
+  if(both) lg.append(el('span',{},el('i',{style:'background:var(--trace)'}),'Did not match (median '+N.um+')'));
+  lg.append(el('span',{},'Curves are approximations built from NRMP medians and quartiles, sized by the match rate.'));
+}
+/* Med school grid */
+function heatColor(v){ if(v==null) return null; const t=clamp(v/85,0,1); const h=4+t*140; const l=92-t*44; return `hsl(${h.toFixed(0)} 62% ${l.toFixed(0)}%)`; }
+let med={r:store.get('mdR',1),c:store.get('mdC',7)};
+function buildMed(){
+  const g=$('#md-gpa'), m=$('#md-mcat');
+  AAMC.rows.forEach((r,i)=>g.append(el('option',{value:i},r)));
+  AAMC.cols.forEach((c,i)=>m.append(el('option',{value:i},c)));
+  g.value=med.r; m.value=med.c;
+  g.addEventListener('change',()=>{med.r=+g.value;store.set('mdR',med.r);renderMed();});
+  m.addEventListener('change',()=>{med.c=+m.value;store.set('mdC',med.c);renderMed();});
+}
+function renderMed(){
+  $('#md-gpa').value=med.r; $('#md-mcat').value=med.c;
+  const v=AAMC.v[med.r][med.c];
+  if(v==null){ $('#ring2-txt').textContent='—'; $('#ring2-fg').setAttribute('stroke-dashoffset','339.3'); $('#md-headline').textContent='Too few applicants to report'; $('#md-sub').textContent='AAMC does not report this combination because fewer than 10 people applied with it.'; }
+  else { setRing('#ring2-fg','#ring2-txt',v); $('#md-headline').textContent=v+'% of past applicants were accepted'; $('#md-sub').textContent='GPA '+AAMC.rows[med.r]+' · MCAT '+AAMC.cols[med.c]+' · overall rate for everyone: 45.1%'; }
+  const wrap=$('#md-grid'); wrap.replaceChildren();
+  const t=el('table',{class:'heat'});
+  t.append(el('thead',{},el('tr',{},el('th',{},'GPA \\ MCAT'),...AAMC.cols.map(c=>el('th',{scope:'col'},c)),el('th',{scope:'col'},'All'))));
+  const tb=el('tbody');
+  AAMC.rows.forEach((r,i)=>{
+    const tr=el('tr',{},el('th',{scope:'row'},r));
+    AAMC.v[i].forEach((v,j)=>{
+      const td=el('td',{class:(v==null?'na':'')+(i===med.r&&j===med.c?' sel':''),style:v==null?null:'background:'+heatColor(v),tabindex:v==null?null:'0','aria-label':'GPA '+r+', MCAT '+AAMC.cols[j]+': '+(v==null?'not reported':v+'%')},v==null?'–':String(v));
+      if(v!=null){ const pick=()=>{med.r=i;med.c=j;store.set('mdR',i);store.set('mdC',j);renderMed();}; td.addEventListener('click',pick); td.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}}); }
+      tr.append(td);
+    });
+    tr.append(el('td',{style:'background:var(--card2);color:var(--ink);font-weight:600',class:'na'},String(AAMC.rowTotals[i])));
+    tb.append(tr);
+  });
+  tb.append(el('tr',{},el('th',{scope:'row'},'All'),...AAMC.colTotals.map(v=>el('td',{class:'na',style:'background:var(--card2);color:var(--ink);font-weight:600'},String(v))),el('td',{class:'na',style:'background:var(--card2);color:var(--ink);font-weight:700'},'45.1')));
+  t.append(tb); wrap.append(t);
+  wrap.append(el('p',{class:'small muted',style:'margin-top:8px'},'Numbers are percent accepted. "–" means fewer than 10 applicants. GPA under 2.00 is not shown. Source: AAMC FACTS Table A-23, 2023–24 through 2025–26.'));
+}
+
+/* ---------------- HPSP ---------------- */
+let hpBuilt=false;
+const FACTS=[
+  {k:'Tuition and required fees',v:'100% covered',d:'At any accredited U.S. MD or DO school. Most books and fees are reimbursed too.',src:['Air Force HPSP fact sheet (July 2026)','https://www.airforcemedicine.af.mil/Media-Center/Fact-Sheets/Article/425437/hpsp-fact-sheet/']},
+  {k:'Monthly stipend',v:'$2,999/mo',d:'Paid for 10½ months a year (taxable). The rate is reset each July by a Defense Health Affairs memo, so check the current amount with your recruiter.',src:['Air Force fact sheet; Navy Accessions','https://www.med.navy.mil/Accessions/Stipend-and-Bonuses-for-HPSP-FAP']},
+  {k:'Sign-on bonus',v:'$20,000',d:'Taxable. The Air Force pays it for a 4-year scholarship (or a 3-year scholarship with a 4-year commitment). Federal law now allows up to $100,000, but the branches advertise $20,000.',src:['Air Force fact sheet; DoD FMR Vol. 7A Ch. 60','https://comptroller.war.gov/Portals/45/Documents/fmr/current/07a/07a_60.pdf']},
+  {k:'Summer training',v:'45 days/yr',d:'Active-duty training each year at Second Lieutenant / Ensign pay, starting with officer training.',src:['Air Force HPSP fact sheet (July 2026)','https://www.airforcemedicine.af.mil/Media-Center/Fact-Sheets/Article/425437/hpsp-fact-sheet/']},
+  {k:'What you owe',v:'1 year per year',d:'One year of active duty for each scholarship year: 4-year recipients owe 4 years; 3-year recipients owe 3 (or 4 if they take the bonus). Payback starts after residency.',src:['Air Force HPSP fact sheet (July 2026)','https://www.airforcemedicine.af.mil/Media-Center/Fact-Sheets/Article/425437/hpsp-fact-sheet/']},
+  {k:'Military residency',v:'Adds its own commitment',d:'Residency years do not count toward payback, and a military residency adds its own year-for-year commitment. The two are served at the same time, so you owe whichever is longer.',src:['AF fact sheet; HPSP overview (Wikipedia)','https://en.wikipedia.org/wiki/Health_Professions_Scholarship_Program']},
+  {k:'Base pay clock',v:'Starts at 0 years',d:'HPSP school years do not count toward years of service for base pay. You start as an O-3 with under 2 years. Military residency years do count toward a 20-year retirement.',src:['10 U.S.C. § 2126 (Army BCMR decision)','https://boards.law.af.mil/ARMY/BCMR/CY2022/20220010772.txt']},
+  {k:'The military match',v:'Start of 4th year',d:'You apply to the Joint GME Selection Board early in your final year. Most are picked for military residencies; some go to civilian programs or do an operational tour first.',src:['Air Force HPSP fact sheet (July 2026)','https://www.airforcemedicine.af.mil/Media-Center/Fact-Sheets/Article/425437/hpsp-fact-sheet/']}
+];
+function renderHPSP(){
+  if(!hpBuilt){
+    const f=$('#hpsp-facts');
+    FACTS.forEach(x=>f.append(el('div',{class:'card fact'},el('p',{class:'k small muted',style:'font-weight:700'},x.k),el('p',{class:'big'},x.v),el('p',{class:'small'},x.d),el('p',{class:'src'},'Source: ',el('a',{href:x.src[1],target:'_blank',rel:'noopener'},x.src[0])))));
+    const sel=$('#hp-spec'); S.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>sel.append(el('option',{value:s.id},s.name+' ('+s.train+' yrs)')));
+    sel.value=store.get('hpSpec','derm');
+    ['#hp-spec','#hp-yrs','#hp-path'].forEach(id=>$(id).addEventListener('change',drawHP));
+    $('#hp-year').addEventListener('input',drawHP);
+    hpBuilt=true;
+  }
+  drawHP();
+}
+function drawHP(){
+  const s=byId[$('#hp-spec').value]; store.set('hpSpec',s.id);
+  const H=+$('#hp-yrs').value, path=$('#hp-path').value, y0=parseInt($('#hp-year').value,10)||2026;
+  const T=s.train, grad=y0+4;
+  let segs, dates, note;
+  if(path==='military'){
+    const owe=Math.max(H,T), free=grad+T+owe;
+    segs=[['Med school',4,'#7652C4'],['Military residency'+(T>5?' + fellowship':''),T,'#C9760F'],['Payback as military attending',owe,'#23804F'],['Civilian attending',Math.max(0,24-4-T-owe),'#13808F']];
+    dates=[['Finish med school',grad],['Finish training',grad+T],['Commitment ends (est.)',free],['Total active duty after school',T+owe+' yrs']];
+    note='Estimate: you owe whichever is longer, your '+H+' scholarship years or your '+T+' years of military training. '+(T>H?'Here the residency commitment is longer, so you owe '+T+' years.':'Here the scholarship commitment is longer or equal, so you owe '+H+' years.')+' Branches handle internships, fellowships and minimums a little differently, so confirm with your commitment paperwork.';
+  } else {
+    const free=grad+1+H, rem=Math.max(0,T-1);
+    segs=[['Med school',4,'#7652C4'],['Internship',1,'#C9760F'],['Operational tour (payback)',H,'#23804F'],['Civilian residency',rem,'#E08A1E'],['Civilian attending',Math.max(0,24-4-1-H-rem),'#13808F']];
+    dates=[['Finish med school',grad],['Finish internship',grad+1],['Commitment ends (est.)',free],['Civilian attending (est.)',free+rem]];
+    note='Estimate: an operational tour (general medical officer or flight surgeon) after internship counts toward your scholarship payback. This assumes the tour covers all '+H+' years and that a civilian program credits your internship, which isn\'t guaranteed. Some specialties make you repeat it. Tour lengths and options vary by branch and by year.';
+  }
+  const tl=$('#hp-tl'); tl.replaceChildren();
+  const total=segs.reduce((a,x)=>a+x[1],0);
+  tl.append(el('div',{class:'tl-row'},el('div',{style:'display:flex;justify-content:space-between;font-weight:700'},el('span',{},s.name),el('span',{class:'mono small muted'},y0+' → '+(y0+total))),
+    el('div',{class:'tl-bar',role:'img','aria-label':segs.filter(x=>x[1]>0).map(x=>x[0]+' '+x[1]+' years').join(', ')},...segs.filter(x=>x[1]>0).map(([l,n,c])=>el('span',{style:`flex:${n};background:${c}`,title:l+' · '+n+' yrs'},n>=2?l:n+'y')))));
+  tl.append(el('div',{class:'legend'},...segs.filter(x=>x[1]>0).map(([l,n,c])=>el('span',{},el('i',{style:'background:'+c}),l+' · '+n+' yr'+(n>1?'s':'')))));
+  const d=$('#hp-dates'); d.replaceChildren(...dates.map(([k,v])=>el('div',{class:'card',style:'padding:12px'},el('p',{class:'small muted',style:'font-weight:700'},k),el('p',{class:'mono',style:'font-size:1.3rem;font-weight:600'},String(v)))));
+  $('#hp-note').textContent=note;
+}
+
+/* ---------------- Sources ---------------- */
+let srcBuilt=false;
+const SOURCES=[
+  ['Doximity Physician Compensation Report 2026','https://www.doximity.com/reports/physician-compensation-report/2026','Average pay for all 51 specialties. Nearly 23,000 full-time U.S. physicians surveyed January–December 2025.'],
+  ['Medscape Physician Compensation Report 2026 (via The DO)','https://thedo.osteopathic.org/2026/07/what-physicians-are-getting-paid-in-2026/','Second pay estimate for 29 specialties; 5,916 physicians surveyed Sept–Dec 2025. Medscape averages run lower than Doximity\'s.'],
+  ['Marit Health 2026 Physician Lifestyle Balance Index','https://www.marithealth.com/posts/2026-physician-lifestyle-balance-index','Hours per week, PTO, call burden, schedule quality and the Lifestyle Balance Index for 36 specialties (24,447 submissions, as of September 16, 2026).'],
+  ['NRMP Charting Outcomes: U.S. MD Seniors, 2026 Main Residency Match','https://www.nrmp.org/match-data/charting-outcomes-characteristics-of-u-s-md-seniors-who-matched-to-their-preferred-specialty-2026-main-residency-match/','Match rates by preferred specialty and Step 2 CK distributions for matched and unmatched applicants (released July 28, 2026). Overall, 86.1% of MD seniors matched to their preferred specialty.'],
+  ['NRMP Charting Outcomes: U.S. DO Seniors, 2026','https://www.nrmp.org/match-data/charting-outcomes-characteristics-of-u-s-do-seniors-who-matched-to-their-preferred-specialty-2026-main-residency-match/','DO match rates by preferred specialty. COMLEX medians were cross-checked with MatchPal Medical\'s 2026 breakdown.'],
+  ['NRMP Results and Data: 2026 Main Residency Match','https://www.nrmp.org/wp-content/uploads/2026/05/Main_Match_Results_and_Data-2026.pdf','Positions offered and filled; 93.5% of U.S. MD seniors matched to a PGY-1 position.'],
+  ['AAMC FACTS Table A-23 (2023–24 through 2025–26)','https://www.aamc.org/data-reports/students-residents/data/facts-applicants-and-matriculants','MCAT × GPA acceptance grid for U.S. MD schools; 155,940 applicants and a 45.1% overall acceptance rate. Cell values were cross-checked across three independent reproductions.'],
+  ['AAMC Survey of Resident/Fellow Stipends 2025 (via AMA)','https://www.ama-assn.org/medical-residents/residency-life/resident-physician-pay-still-rising-growth-trails-inflation','Average resident pay by training year: PGY-1 $68,166, rising to $94,215 at PGY-8.'],
+  ['ACGME program requirements','https://www.acgme.org/specialties/','Typical minimum training lengths for each specialty and fellowship.'],
+  ['Air Force HPSP fact sheet (July 2026)','https://www.airforcemedicine.af.mil/Media-Center/Fact-Sheets/Article/425437/hpsp-fact-sheet/','Stipend, bonus, training, obligation and military match facts.'],
+  ['Navy Accessions: HPSP stipend and bonuses','https://www.med.navy.mil/Accessions/Stipend-and-Bonuses-for-HPSP-FAP','Stipend history ($2,870 → $2,999 on July 1, 2025) and the $20,000 accession bonus.'],
+  ['DFAS medical special pay tables, FY2026','https://www.dfas.mil/MilitaryMembers/payentitlements/Pay-Tables/HPO4','Incentive pays and retention bonuses for military physicians by specialty.'],
+  ['AMA: Medical Liability Claim Frequency Among U.S. Physicians (2023)','https://www.ama-assn.org/system/files/policy-research-perspective-medical-liability-claim-frequency.pdf','Share of physicians ever sued, by specialty (2020–2022 AMA Physician Practice Benchmark Surveys; 32.1% of all physicians).'],
+  ['Jena et al., Malpractice Risk According to Physician Specialty, NEJM 2011','https://pubmed.ncbi.nlm.nih.gov/21848463/','Annual claim rates by specialty, from 19.1% in neurosurgery to 2.6% in psychiatry; 78% of claims led to no payment.'],
+  ['AMA 2026 Organizational Biopsy burnout rates (via Becker\'s)','https://www.beckershospitalreview.com/quality/hospital-physician-relationships/6-of-20-physician-specialties-see-lower-burnout-but-lower-happiness-rates/','Burnout by specialty for 2026. We use only the AMA 2026 figures, not older Medscape numbers, so every rate is from one survey.'],
+  ['NRMP Charting Outcomes: U.S. MD Seniors, 2024','https://www.nrmp.org/wp-content/uploads/2026/03/Charting_Outcomes_MD_Seniors2024_revised-citation.pdf','Average research experiences and abstracts, presentations and publications of matched applicants by specialty (all-specialty average: 10.0).'],
+  ['Stienen et al., Personality traits of surgical and medical doctors, BMJ Open 2018','https://bmjopen.bmj.com/content/8/7/e021310','2,345 board-certified physicians: surgeons scored slightly higher on extraversion and openness and lower on neuroticism; no difference in agreeableness or conscientiousness.'],
+  ['2026 military basic pay table','https://fedpayscale.org/military/2026/','O-3 base pay: $5,534.10/mo with 2 years or less, $6,273.90 over 2 years.']
+];
+function renderSources(){
+  if(srcBuilt) return;
+  const l=$('#src-list');
+  SOURCES.forEach(([t,u,d])=>l.append(el('div',{class:'card src-item'},el('a',{href:u,target:'_blank',rel:'noopener'},t),el('p',{class:'small muted'},d))));
+  l.append(el('div',{class:'card src-item'},el('p',{style:'font-weight:700'},'Methods'),el('p',{class:'small muted'},'Specialty names follow Doximity\'s list. Hematology and Oncology share Marit\'s "Hematology Oncology" lifestyle row. Match rates come from NRMP Table 1 counts (matched ÷ all who preferred the specialty). The Step 2 adjustment treats matched and unmatched scores as bell curves centered on NRMP\'s medians, with spread taken from the matched middle half, and weights them by the match rate. Profile nudges (research ×0.75–1.25, letters ×0.7–1.35, AOA ×1.3, rotation ×1.15, not applying broadly ×0.8) are our assumptions applied to the odds. NRMP\'s Program Director Survey ranks these factors as important but does not publish their exact effect.')));
+  srcBuilt=true;
+}
+
+/* ---------------- Boot ---------------- */
+route();
+})();
+
+</script>
+</body>
+</html>
