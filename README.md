@@ -4,7 +4,7 @@
 
 SpecialtyScope is a free, open-source website for premeds and med students. A 5-minute self-check asks about your personality, stress limits, life outside work, feelings about lawsuits, and interest in research. It then matches you to **51 medical specialties** using published data on burnout, malpractice risk, hours, training length, match odds and pay.
 
-👉 **Try it:** https://YOUR-USERNAME.github.io/specialtyscope
+
 
 <p align="center">
   <img src="docs/home.png" width="260" alt="Home page with floating specialty bubbles">
